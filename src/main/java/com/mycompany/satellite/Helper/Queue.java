@@ -1,5 +1,5 @@
-
 package com.mycompany.satellite.Helper;
+
 /**
  *
  *
@@ -37,7 +37,6 @@ public class Queue<T> {
 	 *
 	 */
 	public void enqueue(T data) {
-
 
 		Node<T> newNode = new Node<>(data);
 		if (isEmpty()) {
