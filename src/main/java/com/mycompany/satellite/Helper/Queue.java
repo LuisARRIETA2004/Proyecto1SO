@@ -1,128 +1,219 @@
-package Helper;
 
+package com.mycompany.satellite.Helper;
 /**
+ *
+ *
  * Cola Genérica (FIFO) implementada con lista enlazada simple.
+ *
+ *
  * No utiliza librerías de java.util
+ *
+ *
  */
 public class Queue<T> {
 
-    private Node<T> front; // Inicio de la cola (por donde salen)
-    private Node<T> rear;  // Final de la cola (por donde entran)
-    private int size;      // Tamaño actual
+	private Node<T> front; // Inicio de la cola (por donde salen)
 
-    public Queue() {
-        this.front = null;
-        this.rear = null;
-        this.size = 0;
-    }
+	private Node<T> rear;  // Final de la cola (por donde entran)
 
-    // --- Métodos Principales ---
+	private int size;      // Tamaño actual
 
-    /**
-     * Agrega un elemento al final de la cola.
-     */
-    public void enqueue(T data) {
-        Node<T> newNode = new Node<>(data);
+	public Queue() {
 
-        if (isEmpty()) {
-            front = newNode;
-            rear = newNode;
-        } else {
-            rear.setNext(newNode);
-            rear = newNode;
-        }
-        size++;
-    }
+		this.front = null;
 
-    /**
-     * Saca y retorna el elemento del frente.
-     */
-    public T dequeue() {
-        if (isEmpty()) {
-            return null;
-        }
+		this.rear = null;
 
-        T data = front.getData();
-        front = front.getNext();
+		this.size = 0;
 
-        if (front == null) {
-            rear = null;
-        }
-        size--;
-        return data;
-    }
+	}
 
-    /**
-     * Mira el elemento del frente sin sacarlo.
-     */
-    public T peek() {
-        if (isEmpty()) {
-            return null;
-        }
-        return front.getData();
-    }
+	// --- Métodos Principales ---
+	/**
+	 *
+	 *
+	 * Agrega un elemento al final de la cola.
+	 *
+	 *
+	 */
+	public void enqueue(T data) {
 
-    public boolean isEmpty() {
-        return front == null;
-    }
 
-    public int getSize() {
-        return size;
-    }
+		Node<T> newNode = new Node<>(data);
+		if (isEmpty()) {
 
-    // --- Métodos Auxiliares para el Proyecto ---
+			front = newNode;
 
-    /**
-     * Busca y elimina un objeto específico de la cola.
-     * Vital para sacar procesos que se bloquean o suspenden estando en la cola de listos.
-     */
-    public boolean remove(T dataToRemove) {
-        if (isEmpty() || dataToRemove == null) {
-            return false;
-        }
+			rear = newNode;
 
-        // Caso 1: El dato está en el frente
-        if (front.getData().equals(dataToRemove)) {
-            dequeue();
-            return true;
-        }
+		} else {
 
-        // Caso 2: Buscar en el resto de la lista
-        Node<T> current = front;
-        while (current.getNext() != null) {
-            if (current.getNext().getData().equals(dataToRemove)) {
-                Node<T> nodeToRemove = current.getNext();
-                
-                // Saltamos el nodo a eliminar
-                current.setNext(nodeToRemove.getNext());
+			rear.setNext(newNode);
 
-                // Si eliminamos el último, actualizamos rear
-                if (nodeToRemove == rear) {
-                    rear = current;
-                }
-                
-                size--;
-                return true;
-            }
-            current = current.getNext();
-        }
-        return false;
-    }
-    
-    /**
-     * Obtiene un elemento por su índice (útil para recorrer la cola en la GUI).
-     * @param index Índice (0 es el frente)
-     * @return El dato o null si fuera de rango.
-     */
-    public T get(int index) {
-        if (isEmpty() || index < 0 || index >= size) {
-            return null;
-        }
-        
-        Node<T> aux = front;
-        for (int i = 0; i < index; i++) {
-            aux = aux.getNext();
-        }
-        return aux.getData();
-    }
+			rear = newNode;
+
+		}
+
+		size++;
+
+	}
+
+	/**
+	 *
+	 *
+	 * Saca y retorna el elemento del frente.
+	 *
+	 *
+	 */
+	public T dequeue() {
+
+		if (isEmpty()) {
+
+			return null;
+
+		}
+
+		T data = front.getData();
+
+		front = front.getNext();
+
+		if (front == null) {
+
+			rear = null;
+
+		}
+
+		size--;
+
+		return data;
+
+	}
+
+	/**
+	 *
+	 *
+	 * Mira el elemento del frente sin sacarlo.
+	 *
+	 *
+	 */
+	public T peek() {
+
+		if (isEmpty()) {
+
+			return null;
+
+		}
+
+		return front.getData();
+
+	}
+
+	public boolean isEmpty() {
+
+		return front == null;
+
+	}
+
+	public int getSize() {
+
+		return size;
+
+	}
+
+	// --- Métodos Auxiliares para el Proyecto ---
+	/**
+	 *
+	 *
+	 * Busca y elimina un objeto específico de la cola.
+	 *
+	 *
+	 * Vital para sacar procesos que se bloquean o suspenden estando en la
+	 * cola de listos.
+	 *
+	 *
+	 */
+	public boolean remove(T dataToRemove) {
+
+		if (isEmpty() || dataToRemove == null) {
+
+			return false;
+
+		}
+
+		// Caso 1: El dato está en el frente
+		if (front.getData().equals(dataToRemove)) {
+
+			dequeue();
+
+			return true;
+
+		}
+
+		// Caso 2: Buscar en el resto de la lista
+		Node<T> current = front;
+
+		while (current.getNext() != null) {
+
+			if (current.getNext().getData().equals(dataToRemove)) {
+
+				Node<T> nodeToRemove = current.getNext();
+
+				// Saltamos el nodo a eliminar
+				current.setNext(nodeToRemove.getNext());
+
+				// Si eliminamos el último, actualizamos rear
+				if (nodeToRemove == rear) {
+
+					rear = current;
+
+				}
+
+				size--;
+
+				return true;
+
+			}
+
+			current = current.getNext();
+
+		}
+
+		return false;
+
+	}
+
+	/**
+	 *
+	 *
+	 * Obtiene un elemento por su índice (útil para recorrer la cola en la
+	 * GUI).
+	 *
+	 *
+	 * @param index Índice (0 es el frente)
+	 *
+	 *
+	 * @return El dato o null si fuera de rango.
+	 *
+	 *
+	 */
+	public T get(int index) {
+
+		if (isEmpty() || index < 0 || index >= size) {
+
+			return null;
+
+		}
+
+		Node<T> aux = front;
+
+		for (int i = 0; i < index; i++) {
+
+			aux = aux.getNext();
+
+		}
+
+		return aux.getData();
+
+	}
+
 }
