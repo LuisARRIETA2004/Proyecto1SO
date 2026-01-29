@@ -22,4 +22,17 @@ public class Stack<T> {
 		newNode.next = top;
 		top = newNode;
 	}
+
+	// Saca el tope del stack, retorna el valor y establece el nuevo tope del stack 
+	public T pop() {
+		if (top == null) {
+			System.out.println("Stack vacio");
+			return null;
+		}
+		else {
+			T data = top.data;
+			top = top.next;
+			return data;
+			}
+	}
 }
