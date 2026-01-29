@@ -214,5 +214,7 @@ public class Queue<T> {
 		return aux.getData();
 
 	}
+	public void runRoundRobin(Queue<Process>queue,int timeSlice) {
 
+	}
 }
