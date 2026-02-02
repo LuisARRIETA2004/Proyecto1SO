@@ -8,12 +8,12 @@ package com.mycompany.satellite.gui;
  *
  * @author User
  */
-public class VentanaSimluacion extends javax.swing.JFrame {
+public class VentanaSimulacion extends javax.swing.JFrame {
 
     /**
      * Creates new form VentanaSimluacion
      */
-    public VentanaSimluacion() {
+    public VentanaSimulacion() {
         initComponents();
     }
 
