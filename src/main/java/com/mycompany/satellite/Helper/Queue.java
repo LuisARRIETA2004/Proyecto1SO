@@ -1,5 +1,7 @@
 package com.mycompany.satellite.Helper;
 
+import main.classes.PCB;
+
 /**
  *
  *
@@ -11,6 +13,8 @@ package com.mycompany.satellite.Helper;
  *
  */
 public class Queue<T> {
+
+	private static final int QUANTUM = 5;
 
 	private Node<T> front; // Inicio de la cola (por donde salen)
 
@@ -214,7 +218,29 @@ public class Queue<T> {
 		return aux.getData();
 
 	}
-	public void runRoundRobin(Queue<Process>queue,int timeSlice) {
 
+	public void runRoundRobin(Queue<PCB> readyQueue) {
+		while (!readyQueue.isEmpty()) {
+
+			PCB currentProcess = readyQueue.dequeue();
+
+			System.out.println("Proceso: " + currentProcess.getProcessName());
+			int timeSpent = 0;
+
+			if (currentProcess.getTimeInCpu() > QUANTUM) {
+				timeSpent = QUANTUM;
+			} else {
+				timeSpent = currentProcess.getTimeInCpu();
+			}
+			currentProcess.setTimeInCpu(currentProcess.getTimeInCpu() - timeSpent); 
+			if (currentProcess.getTimeInCpu() > 0) {
+				System.out.println("NO TERMINADO");
+				readyQueue.enqueue(currentProcess);
+			} else {
+				System.out.println("   -> " + currentProcess.getProcessName() + "TERMINO ");
+			}
+
+			System.out.println("--------------------------------");
+		}
 	}
 }
