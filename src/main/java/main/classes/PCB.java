@@ -3,190 +3,55 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package main.classes;
-import java.util.UUID;
-/**
- *
- * @author truenno
- */
-public class PCB {
-	
 
-    public enum ProcessState {
-        NEW,
-        READY,
-        RUNNING,
-        BLOCKED,
-        FINISHED,
-        READY_SUSPENDED,
-        BLOCKED_SUSPENDED
+public class PCB {
+    private int id;
+    private String estado;       // "Nuevo", "Listo", "Ejecucion", "Bloqueado", "Suspendido"
+    private int programCounter;  // PC
+    private int mar;             // MAR
+    
+    // Datos para la planificación
+    private int ciclosTotales;   // Duración total (Instrucciones)
+    private int ciclosRestantes; // Cuánto falta para terminar
+    private int prioridad;       // 1 (Alta), 2 (Media), 3 (Baja)
+    private int deadline;        // Ciclo límite para terminar
+
+    // Constructor Completo
+    public PCB(int id, int ciclosTotales, int prioridad, int deadline) {
+        this.id = id;
+        this.ciclosTotales = ciclosTotales;
+        this.ciclosRestantes = ciclosTotales; // Al inicio, restante = total
+        this.prioridad = prioridad;
+        this.deadline = deadline;
+        
+        this.estado = "Nuevo";
+        this.programCounter = 0;
+        this.mar = 0;
     }
 
-    private UUID processID;
-    private String processName;
-    private String user;
+    // --- Getters y Setters ---
+    public int getId() { return id; }
+    
+    public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
+    
+    public int getProgramCounter() { return programCounter; }
+    public void setProgramCounter(int pc) { this.programCounter = pc; }
+    
+    public int getMar() { return mar; }
+    public void setMar(int mar) { this.mar = mar; }
+    
+    public int getCiclosRestantes() { return ciclosRestantes; }
+    public void setCiclosRestantes(int ciclos) { this.ciclosRestantes = ciclos; }
 
-    private ProcessState state;
-    private int priority;
-    private int cyclesForException; //  I/0 bound 
-    private int satisfyExceptionCycles; //  I/0 bound 
+    public int getPrioridad() { return prioridad; }
+    public int getDeadline() { return deadline; }
+    public int getCiclosTotales() { return ciclosTotales; }
 
-    private int programCounter;
-    private int remainingInstructions;
-    private int timeInCpu;
-    private int stackPointer;
-    private int totalInstructions;
-    private int memoryAddressRegister;
-    private String processType;
-
-    private int memSize; //Tamano para cada proceso.
-    private int BASE_MEMORY = 64;
-    private boolean ioRequestFlag = false;
-    private int cyclesSpentBlocked = 0;      // Cronómetro para el tiempo en estado de bloqueo cuando es i/o bound 
-
-	public UUID getProcessID() {
-		return processID;
-	}
-
-	public String getProcessName() {
-		return processName;
-	}
-
-	public String getUser() {
-		return user;
-	}
-
-	public ProcessState getState() {
-		return state;
-	}
-
-	public int getPriority() {
-		return priority;
-	}
-
-	public int getCyclesForException() {
-		return cyclesForException;
-	}
-
-	public int getSatisfyExceptionCycles() {
-		return satisfyExceptionCycles;
-	}
-
-	public int getProgramCounter() {
-		return programCounter;
-	}
-
-	public int getRemainingInstructions() {
-		return remainingInstructions;
-	}
-
-	public int getTimeInCpu() {
-		return timeInCpu;
-	}
-
-	public int getStackPointer() {
-		return stackPointer;
-	}
-
-	public int getTotalInstructions() {
-		return totalInstructions;
-	}
-
-	public int getMemoryAddressRegister() {
-		return memoryAddressRegister;
-	}
-
-	public String getProcessType() {
-		return processType;
-	}
-
-	public int getMemSize() {
-		return memSize;
-	}
-
-	public int getBASE_MEMORY() {
-		return BASE_MEMORY;
-	}
-
-	public boolean isIoRequestFlag() {
-		return ioRequestFlag;
-	}
-
-	public int getCyclesSpentBlocked() {
-		return cyclesSpentBlocked;
-	}
-
-	public void setProcessID(UUID processID) {
-		this.processID = processID;
-	}
-
-	public void setProcessName(String processName) {
-		this.processName = processName;
-	}
-
-	public void setUser(String user) {
-		this.user = user;
-	}
-
-	public void setState(ProcessState state) {
-		this.state = state;
-	}
-
-	public void setPriority(int priority) {
-		this.priority = priority;
-	}
-
-	public void setCyclesForException(int cyclesForException) {
-		this.cyclesForException = cyclesForException;
-	}
-
-	public void setSatisfyExceptionCycles(int satisfyExceptionCycles) {
-		this.satisfyExceptionCycles = satisfyExceptionCycles;
-	}
-
-	public void setProgramCounter(int programCounter) {
-		this.programCounter = programCounter;
-	}
-
-	public void setRemainingInstructions(int remainingInstructions) {
-		this.remainingInstructions = remainingInstructions;
-	}
-
-	public void setTimeInCpu(int timeInCpu) {
-		this.timeInCpu = timeInCpu;
-	}
-
-	public void setStackPointer(int stackPointer) {
-		this.stackPointer = stackPointer;
-	}
-
-	public void setTotalInstructions(int totalInstructions) {
-		this.totalInstructions = totalInstructions;
-	}
-
-	public void setMemoryAddressRegister(int memoryAddressRegister) {
-		this.memoryAddressRegister = memoryAddressRegister;
-	}
-
-	public void setProcessType(String processType) {
-		this.processType = processType;
-	}
-
-	public void setMemSize(int memSize) {
-		this.memSize = memSize;
-	}
-
-	public void setBASE_MEMORY(int BASE_MEMORY) {
-		this.BASE_MEMORY = BASE_MEMORY;
-	}
-
-	public void setIoRequestFlag(boolean ioRequestFlag) {
-		this.ioRequestFlag = ioRequestFlag;
-	}
-
-	public void setCyclesSpentBlocked(int cyclesSpentBlocked) {
-		this.cyclesSpentBlocked = cyclesSpentBlocked;
-	}
-
-
+    // --- ToString para mostrar en la lista visual ---
+    @Override
+    public String toString() {
+        // Ejemplo: "ID:1 | Prio:1 | Rest: 15"
+        return "ID:" + id + " | P:" + prioridad + " | Rest:" + ciclosRestantes;
+    }
 }
-

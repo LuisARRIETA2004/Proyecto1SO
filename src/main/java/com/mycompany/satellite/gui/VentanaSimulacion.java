@@ -2,7 +2,17 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
  */
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
+ */
 package com.mycompany.satellite.gui;
+
+import com.mycompany.satellite.Helper.Queue;
+import com.mycompany.satellite.Helper.GeneradorProcesos;
+import main.classes.PCB;
+import javax.swing.DefaultListModel;
 
 /**
  *
@@ -10,11 +20,44 @@ package com.mycompany.satellite.gui;
  */
 public class VentanaSimulacion extends javax.swing.JFrame {
 
+    // --- VARIABLES GLOBALES DEL SISTEMA ---
+    private Queue<PCB> colaListos;
+    private Queue<PCB> colaBloqueados;
+    
+    // Modelos para pintar las listas (Frontend)
+    private DefaultListModel<String> modeloListos;
+    private DefaultListModel<String> modeloBloqueados;
+    private DefaultListModel<String> modeloListosSusp;
+    private DefaultListModel<String> modeloBloqSusp;
+
+    // Contador global de IDs
+    private int contadorIds = 1;
+
     /**
-     * Creates new form VentanaSimluacion
+     * Constructor
      */
     public VentanaSimulacion() {
+        // 1. Inicializar las estructuras de datos (Backend)
+        colaListos = new Queue<>();
+        colaBloqueados = new Queue<>();
+
+        // 2. Inicializar los modelos visuales (Frontend)
+        modeloListos = new DefaultListModel<>();
+        modeloBloqueados = new DefaultListModel<>();
+        modeloListosSusp = new DefaultListModel<>();
+        modeloBloqSusp = new DefaultListModel<>();
+
+        // 3. Cargar componentes visuales (Código de NetBeans)
         initComponents();
+
+        // 4. Conectar los modelos a tus JList
+        listReadyQueue.setModel(modeloListos);
+        listBlockedQueue.setModel(modeloBloqueados);
+        listListosSuspendidos.setModel(modeloListosSusp);
+        listBloqueadosSuspendidos.setModel(modeloBloqSusp);
+
+        // 5. Cargar procesos iniciales automáticamente (Requisito PDF)
+        cargarProcesosIniciales();
     }
 
     /**
@@ -288,10 +331,6 @@ public class VentanaSimulacion extends javax.swing.JFrame {
      */
     public static void main(String args[]) {
         /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
         try {
             for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {
@@ -308,7 +347,6 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         } catch (javax.swing.UnsupportedLookAndFeelException ex) {
             java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
-        //</editor-fold>
 
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
@@ -316,6 +354,59 @@ public class VentanaSimulacion extends javax.swing.JFrame {
                 new VentanaSimulacion().setVisible(true);
             }
         });
+    }
+
+    // --- MÉTODOS DE LÓGICA AGREGADOS AL FINAL ---
+
+    /**
+     * Genera 5 procesos al iniciar la app (Requisito: Configuración Inicial Dinámica)
+     */
+    private void cargarProcesosIniciales() {
+        for (int i = 0; i < 5; i++) {
+            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
+            nuevo.setEstado("Listo");
+            colaListos.enqueue(nuevo);
+        }
+        actualizarListasVisuales();
+    }
+
+    /**
+     * Toma los datos de las Queues y los pinta en los JList
+     */
+    public void actualizarListasVisuales() {
+        // --- Cola de Listos ---
+        modeloListos.clear();
+        for (int i = 0; i < colaListos.getSize(); i++) {
+            PCB p = colaListos.get(i);
+            if (p != null) modeloListos.addElement(p.toString());
+        }
+        
+        // --- Cola de Bloqueados ---
+        modeloBloqueados.clear();
+        for (int i = 0; i < colaBloqueados.getSize(); i++) {
+            PCB p = colaBloqueados.get(i);
+            if (p != null) modeloBloqueados.addElement(p.toString());
+        }
+    }
+
+    // --- Métodos para los botones (Conéctalos en Design) ---
+    public void accionGenerar20() {
+        for (int i = 0; i < 20; i++) {
+            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
+            nuevo.setEstado("Listo");
+            colaListos.enqueue(nuevo);
+        }
+        System.out.println(">> Generados 20 procesos.");
+        actualizarListasVisuales();
+    }
+    
+    public void accionEmergencia() {
+        PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
+        // nuevo.setPrioridad(1); 
+        nuevo.setEstado("Listo");
+        colaListos.enqueue(nuevo);
+        System.out.println(">> Emergencia creada: ID " + (contadorIds-1));
+        actualizarListasVisuales();
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
