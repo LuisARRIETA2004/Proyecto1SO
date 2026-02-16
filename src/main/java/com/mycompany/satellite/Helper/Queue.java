@@ -151,7 +151,7 @@ public class Queue<T> {
 	/**
 	 * Funcion para determinar la prioridad dependiendo del algoritmo usado
 	 */
-	private boolean shouldSwap(PCB newPcb, PCB currentPcb, String algorithm) {
+	public boolean shouldSwap(PCB newPcb, PCB currentPcb, String algorithm) {
 		switch (algorithm) {
 			case "SRT":
 				return newPcb.getCiclosRestantes() < currentPcb.getCiclosRestantes();
