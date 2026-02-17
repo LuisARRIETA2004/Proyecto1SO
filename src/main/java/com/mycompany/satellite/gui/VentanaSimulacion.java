@@ -112,26 +112,10 @@ public class VentanaSimulacion extends javax.swing.JFrame {
             if (p != null) modelo.addElement(p.toString());
         }
     }
-
     // ---------------------------------------------------------
     // ACCIONES DE BOTONES (Conectar en Design)
     // ---------------------------------------------------------
 
-    private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {                                             
-        for (int i = 0; i < 20; i++) {
-            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-            nuevo.setEstado("Listo");
-            
-            // Lógica simple de memoria llena (Swap)
-            if (colaListos.getSize() + colaBloqueados.getSize() >= MAX_MEMORIA) {
-                nuevo.setEstado("Listo-Suspendido");
-                colaListosSusp.enqueue(nuevo);
-            } else {
-                colaListos.enqueue(nuevo);
-            }
-        }
-        actualizarInterfaz();
-    }                                            
 
     private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {                                              
         PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
@@ -402,6 +386,11 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         btnStart.setMinimumSize(new java.awt.Dimension(70, 20));
 
         btnGenerar20.setText("GENERAR 20");
+        btnGenerar20.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnGenerar20ActionPerformed(evt);
+            }
+        });
 
         btnEmergencia.setText("EMERGENCIA");
 
@@ -482,6 +471,32 @@ public class VentanaSimulacion extends javax.swing.JFrame {
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
+
+    private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnGenerar20ActionPerformed
+         System.out.println("--- Generando lote de 20 procesos ---");
+
+        for (int i = 0; i < 20; i++) {
+            // 1. Crear el proceso usando la clase Helper
+            main.classes.PCB nuevo = com.mycompany.satellite.Helper.GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
+
+            // 2. Calcular cuántos procesos hay actualmente en RAM
+            int procesosEnRAM = colaListos.getSize() + colaBloqueados.getSize();
+
+            // 3. Decidir dónde guardar el proceso
+            if (procesosEnRAM < MAX_MEMORIA) {
+                // Si hay espacio en RAM (menor a 10), va a la cola de Listos
+                nuevo.setEstado("Listo");
+                colaListos.enqueue(nuevo);
+            } else {
+                // Si la RAM está llena, va al Disco (Swap) -> Listo-Suspendido
+                nuevo.setEstado("Listo-Suspendido");
+                colaListosSusp.enqueue(nuevo);
+            }
+        }
+
+        // 4. Actualizar toda la interfaz visual
+        actualizarInterfaz();
+    }//GEN-LAST:event_btnGenerar20ActionPerformed
 
     /**
      * @param args the command line arguments

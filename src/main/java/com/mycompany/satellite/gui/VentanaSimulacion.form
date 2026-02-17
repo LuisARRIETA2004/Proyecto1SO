@@ -583,6 +583,9 @@
           <Properties>
             <Property name="text" type="java.lang.String" value="GENERAR 20"/>
           </Properties>
+          <Events>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="btnGenerar20ActionPerformed"/>
+          </Events>
         </Component>
         <Component class="javax.swing.JButton" name="btnEmergencia">
           <Properties>
