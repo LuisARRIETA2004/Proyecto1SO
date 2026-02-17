@@ -11,7 +11,7 @@ import java.awt.Color;
  * Ventana Principal del Simulador RTOS
  */
 public class VentanaSimulacion extends javax.swing.JFrame {
-
+    
     // --- ESTRUCTURAS DE DATOS (Backend) ---
     private Queue<PCB> colaListos;
     private Queue<PCB> colaBloqueados;
@@ -23,12 +23,16 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     private DefaultListModel<String> modeloBloqueados;
     private DefaultListModel<String> modeloListosSusp;
     private DefaultListModel<String> modeloBloqSusp;
-
+    private PCB procesoEnCPU = null;
+    
     // --- VARIABLES DE CONTROL ---
     private int contadorIds = 1;
     private int cicloReloj = 0;
     private final int MAX_MEMORIA = 10; // Capacidad máxima de la RAM simulada
-
+    
+    // --- VARIABLES DEL MOTOR (HILOS) ---
+    private boolean ejecutando = false; // Bandera para saber si corre o no
+    private Thread hiloSimulacion;      // El hilo que actualizará el reloj
     /**
      * Constructor: Inicializa todo
      */
@@ -82,19 +86,28 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     /**
      * Refresca TODOS los elementos visuales basándose en las colas reales
      */
+    private void llenarModelo(DefaultListModel<String> modelo, Queue<PCB> cola) {
+        modelo.clear();
+        for (int i = 0; i < cola.getSize(); i++) {
+            PCB p = cola.get(i);
+            if (p != null) {
+                modelo.addElement(p.toString());
+            }
+        }
+    }
     public void actualizarInterfaz() {
         // 1. Actualizar Reloj
         lblReloj.setText("MISSION CLOCK: Cycle " + cicloReloj);
 
-        // 2. Actualizar Listas (Helpers visuales)
+        // 2. Actualizar Listas
         llenarModelo(modeloListos, colaListos);
         llenarModelo(modeloBloqueados, colaBloqueados);
         llenarModelo(modeloListosSusp, colaListosSusp);
         llenarModelo(modeloBloqSusp, colaBloqSusp);
 
         // 3. Actualizar Barra de Memoria RAM
-        int ocupados = colaListos.getSize() + colaBloqueados.getSize(); 
-        // Nota: En un sistema real, sumamos también el proceso en CPU
+        int ocupados = colaListos.getSize() + colaBloqueados.getSize();
+        if (procesoEnCPU != null) ocupados++; // Contar también el de CPU
         
         int porcentaje = (ocupados * 100) / MAX_MEMORIA;
         barraMemoria.setValue(porcentaje);
@@ -102,16 +115,24 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         
         if (porcentaje >= 100) barraMemoria.setForeground(Color.RED);
         else barraMemoria.setForeground(Color.GREEN);
-    }
-
-    // Método auxiliar para no repetir código de llenado de listas
-    private void llenarModelo(DefaultListModel<String> modelo, Queue<PCB> cola) {
-        modelo.clear();
-        for (int i = 0; i < cola.getSize(); i++) {
-            PCB p = cola.get(i);
-            if (p != null) modelo.addElement(p.toString());
+        
+        // 4. ACTUALIZAR PANEL CPU (Running Process)
+        if (procesoEnCPU != null) {
+            lblCpuId.setText(String.valueOf(procesoEnCPU.getId()));
+            lblCpuEstado.setText(procesoEnCPU.getEstado());
+            lblCpuPC.setText(String.valueOf(procesoEnCPU.getProgramCounter()));
+            lblCpuMAR.setText(String.valueOf(procesoEnCPU.getMar()));
+            // lblCpuCiclos.setText(String.valueOf(procesoEnCPU.getCiclosRestantes())); // Si tienes este label
+        } else {
+            lblCpuId.setText("---");
+            lblCpuEstado.setText("IDLE"); // Ocioso
+            lblCpuPC.setText("---");
+            lblCpuMAR.setText("---");
         }
     }
+    // ---------------------------------------------------------
+    // ACCIONES DE BOTONES (Conectar en Design)
+    // ---------------------------------------------------------
     // ---------------------------------------------------------
     // ACCIONES DE BOTONES (Conectar en Design)
     // ---------------------------------------------------------
@@ -119,17 +140,24 @@ public class VentanaSimulacion extends javax.swing.JFrame {
 
     private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {                                              
         PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-        nuevo.setEstado("Listo"); // Las emergencias intentan entrar a RAM
-        // Aquí podrías implementar lógica para expulsar a alguien si está llena
-        colaListos.enqueue(nuevo);
+        
+        // Calcular espacio en RAM (Listos + Bloqueados + El que esté en CPU)
+        int ocupados = colaListos.getSize() + colaBloqueados.getSize();
+        if (procesoEnCPU != null) ocupados++;
+
+        // Lógica de Memoria (Swap)
+        if (ocupados < MAX_MEMORIA) {
+            nuevo.setEstado("Listo");
+            colaListos.enqueue(nuevo);
+        } else {
+            // Si la RAM está llena, la emergencia va a Disco (o podrías programar expulsión)
+            nuevo.setEstado("Listo-Suspendido");
+            colaListosSusp.enqueue(nuevo);
+        }
+        
         actualizarInterfaz();
     }                                             
 
-    private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        // Aquí irá el Timer o Hilo de simulación más adelante
-        cicloReloj++;
-        actualizarInterfaz();
-    }     
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -384,6 +412,11 @@ public class VentanaSimulacion extends javax.swing.JFrame {
 
         btnStart.setText("INICIAR");
         btnStart.setMinimumSize(new java.awt.Dimension(70, 20));
+        btnStart.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnStartActionPerformed(evt);
+            }
+        });
 
         btnGenerar20.setText("GENERAR 20");
         btnGenerar20.addActionListener(new java.awt.event.ActionListener() {
@@ -448,7 +481,7 @@ public class VentanaSimulacion extends javax.swing.JFrame {
                 .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 40, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 46, Short.MAX_VALUE)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(btnEmergencia, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(btnStart, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -464,9 +497,7 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 6, Short.MAX_VALUE))
+            .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
 
         pack();
@@ -498,6 +529,81 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         actualizarInterfaz();
     }//GEN-LAST:event_btnGenerar20ActionPerformed
 
+    private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStartActionPerformed
+        if (!ejecutando) {
+            iniciarMotor();
+        } else {
+            detenerMotor();
+        }        // TODO add your handling code here:
+    }//GEN-LAST:event_btnStartActionPerformed
+        private void iniciarMotor() {
+        if (ejecutando) return; 
+
+        ejecutando = true;
+        btnStart.setText("DETENER");
+
+        hiloSimulacion = new Thread(() -> {
+            while (ejecutando) {
+                try {
+                    // 1. Avanzar reloj
+                    cicloReloj++;
+                    
+                    // --- LÓGICA DEL KERNEL (SIMULADA) ---
+                    
+                    // A. Si no hay nadie en CPU, buscamos en la cola de Listos
+                    if (procesoEnCPU == null) {
+                        if (!colaListos.isEmpty()) {
+                            procesoEnCPU = colaListos.dequeue();
+                            procesoEnCPU.setEstado("Ejecucion");
+                        }
+                    }
+                    
+                    // B. Si hay alguien en CPU, lo procesamos
+                    if (procesoEnCPU != null) {
+                        // Simular trabajo: Aumentar PC y MAR
+                        procesoEnCPU.setProgramCounter(procesoEnCPU.getProgramCounter() + 1);
+                        procesoEnCPU.setMar(procesoEnCPU.getMar() + 1);
+                        procesoEnCPU.setCiclosRestantes(procesoEnCPU.getCiclosRestantes() - 1);
+                        
+                        // C. Verificar si terminó
+                        if (procesoEnCPU.getCiclosRestantes() <= 0) {
+                            procesoEnCPU.setEstado("Terminado");
+                            // Aquí podrías guardarlo en una lista de terminados o archivo
+                            procesoEnCPU = null; // Liberar CPU
+                            
+                            // D. Intentar traer alguien del Swap (Disco) a RAM si hay espacio
+                            if (!colaListosSusp.isEmpty()) {
+                                PCB recuperado = colaListosSusp.dequeue();
+                                recuperado.setEstado("Listo");
+                                colaListos.enqueue(recuperado);
+                            }
+                        }
+                    }
+                    // -------------------------------------
+
+                    // 2. Actualizar visuales
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        actualizarInterfaz();
+                    });
+
+                    Thread.sleep(1000); 
+
+                } catch (InterruptedException e) {
+                    System.out.println("Simulación interrumpida");
+                }
+            }
+        });
+        
+        hiloSimulacion.start();
+    }
+
+    /**
+     * Apaga el motor
+     */
+    private void detenerMotor() {
+        ejecutando = false;
+        btnStart.setText("INICIAR");
+    }
     /**
      * @param args the command line arguments
      */
