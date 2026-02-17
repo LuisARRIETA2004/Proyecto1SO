@@ -12,6 +12,8 @@ import java.awt.Color;
  */
 public class VentanaSimulacion extends javax.swing.JFrame {
     
+    private String algoritmoActual = "FCFS";
+
     // --- ESTRUCTURAS DE DATOS (Backend) ---
     private Queue<PCB> colaListos;
     private Queue<PCB> colaBloqueados;
@@ -573,7 +575,31 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     }//GEN-LAST:event_btnStartActionPerformed
 
     private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboAlgoritmosActionPerformed
-        // TODO add your handling code here:
+         // 1. Capturar qué seleccionó el usuario
+        algoritmoActual = (String) comboPolitica.getSelectedItem();
+        System.out.println(">>> Cambio de Política: " + algoritmoActual);
+        
+        // 2. Aplicar la lógica del algoritmo inmediatamente
+        // (El PDF dice: "Cualquier cambio debe ser visible de inmediato")
+        switch (algoritmoActual) {
+            case "FCFS":
+                break;
+                
+            case "Round Robin":
+                break;
+                
+            case "SPN": // Shortest Process Next
+                break;
+                
+            case "SRT":
+                break;
+                
+            case "HRRN":
+                break;
+        }
+        
+        // Refrescar la pantalla para ver si el orden cambió
+        actualizarInterfaz();
     }//GEN-LAST:event_comboAlgoritmosActionPerformed
         private void iniciarMotor() {
         if (ejecutando) return; 
