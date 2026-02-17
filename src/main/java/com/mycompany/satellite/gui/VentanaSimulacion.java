@@ -576,11 +576,9 @@ public class VentanaSimulacion extends javax.swing.JFrame {
 
     private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboAlgoritmosActionPerformed
          // 1. Capturar qué seleccionó el usuario
-        algoritmoActual = (String) comboPolitica.getSelectedItem();
+        algoritmoActual = (String) comboAlgoritmos.getSelectedItem(); // <--- CORREGIDO
         System.out.println(">>> Cambio de Política: " + algoritmoActual);
         
-        // 2. Aplicar la lógica del algoritmo inmediatamente
-        // (El PDF dice: "Cualquier cambio debe ser visible de inmediato")
         switch (algoritmoActual) {
             case "FCFS":
                 break;
