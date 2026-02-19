@@ -1,225 +1,172 @@
+// Importaciones necesarias
+                                         
 package com.mycompany.satellite.gui;
 
-// Importaciones necesarias
-import com.mycompany.satellite.Helper.Queue;
 import com.mycompany.satellite.Helper.GeneradorProcesos;
+import com.mycompany.satellite.Helper.Queue;
 import main.classes.PCB;
+import main.classes.Planificador; 
 import javax.swing.DefaultListModel;
 import java.awt.Color;
 
-/**
- * Ventana Principal del Simulador RTOS
- */
 public class VentanaSimulacion extends javax.swing.JFrame {
-    
-    // --- VARIABLES PARA ALGORITMOS ---
-    private int quantum = 5;          // Tiempo máximo para Round Robin
-    private int contadorQuantum = 0;  // Contador actual del proceso en CPU
-    
-    private String algoritmoActual = "FCFS";
 
-    // --- ESTRUCTURAS DE DATOS (Backend) ---
-    private Queue<PCB> colaListos;
-    private Queue<PCB> colaBloqueados;
-    private Queue<PCB> colaListosSusp;
-    private Queue<PCB> colaBloqSusp;
-    
-    // --- MODELOS VISUALES (Frontend) ---
-    private DefaultListModel<String> modeloListos;
-    private DefaultListModel<String> modeloBloqueados;
-    private DefaultListModel<String> modeloListosSusp;
-    private DefaultListModel<String> modeloBloqSusp;
-    private PCB procesoEnCPU = null;
-    
+    // --- EL CEREBRO DEL SISTEMA ---
+    private Planificador kernel; // Ahora usamos tu clase Planificador
+
+    // --- MODELOS VISUALES ---
+    private DefaultListModel<String> modeloListos = new DefaultListModel<>();
+    private DefaultListModel<String> modeloBloqueados = new DefaultListModel<>();
+    private DefaultListModel<String> modeloListosSusp = new DefaultListModel<>();
+    private DefaultListModel<String> modeloBloqSusp = new DefaultListModel<>();
+
     // --- VARIABLES DE CONTROL ---
     private int contadorIds = 1;
     private int cicloReloj = 0;
-    private final int MAX_MEMORIA = 10; // Capacidad máxima de la RAM simulada
-    
-    // --- VARIABLES DEL MOTOR (HILOS) ---
-    private boolean ejecutando = false; // Bandera para saber si corre o no
-    private Thread hiloSimulacion;      // El hilo que actualizará el reloj
-    /**
-     * Constructor: Inicializa todo
-     */
+    private boolean ejecutando = false; 
+    private Thread hiloSimulacion;      
+
     public VentanaSimulacion() {
-        // 1. Inicializar Colas
-        colaListos = new Queue<>();
-        colaBloqueados = new Queue<>();
-        colaListosSusp = new Queue<>();
-        colaBloqSusp = new Queue<>();
+        // 1. Inicializar el Kernel
+        kernel = new Planificador();
 
-        // 2. Inicializar Modelos de Listas
-        modeloListos = new DefaultListModel<>();
-        modeloBloqueados = new DefaultListModel<>();
-        modeloListosSusp = new DefaultListModel<>();
-        modeloBloqSusp = new DefaultListModel<>();
-
-        // 3. Cargar Diseño Visual
+        // 2. GUI (NetBeans)
         initComponents();
-        personalizarDiseño();
+        this.setLocationRelativeTo(null);
+        this.getContentPane().setBackground(new Color(0, 0, 51));
 
-        // 4. Conectar Modelos a las Listas Visuales
+        // 3. Conectar Modelos
         listReadyQueue.setModel(modeloListos);
         listBlockedQueue.setModel(modeloBloqueados);
         listListosSuspendidos.setModel(modeloListosSusp);
         listBloqueadosSuspendidos.setModel(modeloBloqSusp);
 
-        // 5. Carga Inicial Automática (Requisito PDF)
+        // 4. Carga Inicial
         cargarProcesosIniciales();
     }
     
-    /**
-     * Saca todos los procesos de la cola de listos, los ordena según el algoritmo
-     * seleccionado y los vuelve a meter.
-     */
-    private void reordenarColaListos() {
-        if (colaListos.isEmpty()) return;
-
-        // 1. Volcar la cola en un arreglo temporal
-        int n = colaListos.getSize();
-        PCB[] tempArray = new PCB[n];
-        for (int i = 0; i < n; i++) {
-            tempArray[i] = colaListos.dequeue();
-        }
-
-        // 2. Ordenar el arreglo (Burbuja) según el algoritmo
-        for (int i = 0; i < n - 1; i++) {
-            for (int j = 0; j < n - i - 1; j++) {
-                boolean cambiar = false;
-                
-                PCB p1 = tempArray[j];
-                PCB p2 = tempArray[j + 1];
-
-                switch (algoritmoActual) {
-                    case "SPN": // Shortest Process Next (Por Ciclos Totales)
-                        if (p1.getCiclosTotales() > p2.getCiclosTotales()) cambiar = true;
-                        break;
-                        
-                    case "SRT": // Shortest Remaining Time (Por Ciclos Restantes)
-                        if (p1.getCiclosRestantes() > p2.getCiclosRestantes()) cambiar = true;
-                        break;
-                        
-                    case "HRRN": // Highest Response Ratio Next (Complejo, usaremos Prioridad por ahora)
-                    case "Prioridad": // Menor número = Mayor prioridad (1 gana a 3)
-                        if (p1.getPrioridad() > p2.getPrioridad()) cambiar = true;
-                        break;
-                        
-                    case "FCFS":
-                    case "Round Robin":
-                        // Estos NO se reordenan, respetan orden de llegada
-                        break;
-                }
-
-                if (cambiar) {
-                    PCB temp = tempArray[j];
-                    tempArray[j] = tempArray[j + 1];
-                    tempArray[j + 1] = temp;
-                }
-            }
-        }
-
-        // 3. Regresar todo a la cola ya ordenado
-        for (int i = 0; i < n; i++) {
-            colaListos.enqueue(tempArray[i]);
-        }
-    }
-    
     private void personalizarDiseño() {
-        this.setLocationRelativeTo(null); // Centrar ventana
-        // Configurar colores básicos si no se hizo en el diseñador
+        this.setLocationRelativeTo(null);
         this.getContentPane().setBackground(new Color(0, 0, 51));
     }
 
-    // ---------------------------------------------------------
-    // LÓGICA DE NEGOCIO
-    // ---------------------------------------------------------
+    // --- LÓGICA DE INTERFAZ ---
 
     private void cargarProcesosIniciales() {
-        // Crear 5 procesos al inicio
         for (int i = 0; i < 5; i++) {
             PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-            nuevo.setEstado("Listo");
-            colaListos.enqueue(nuevo);
+            kernel.agregarProceso(nuevo); // Delegamos al Kernel
         }
         actualizarInterfaz();
     }
 
-    /**
-     * Refresca TODOS los elementos visuales basándose en las colas reales
-     */
-    private void llenarModelo(DefaultListModel<String> modelo, Queue<PCB> cola) {
-        modelo.clear();
-        for (int i = 0; i < cola.getSize(); i++) {
-            PCB p = cola.get(i);
-            if (p != null) {
-                modelo.addElement(p.toString());
-            }
-        }
-    }
     public void actualizarInterfaz() {
-        // 1. Actualizar Reloj
         lblReloj.setText("MISSION CLOCK: Cycle " + cicloReloj);
 
-        // 2. Actualizar Listas
-        llenarModelo(modeloListos, colaListos);
-        llenarModelo(modeloBloqueados, colaBloqueados);
-        llenarModelo(modeloListosSusp, colaListosSusp);
-        llenarModelo(modeloBloqSusp, colaBloqSusp);
+        // Leemos las colas DESDE EL KERNEL
+        llenarModelo(modeloListos, kernel.getColaListos());
+        llenarModelo(modeloBloqueados, kernel.getColaBloqueados());
+        llenarModelo(modeloListosSusp, kernel.getColaListosSusp());
+        llenarModelo(modeloBloqSusp, kernel.getColaBloqSusp());
 
-        // 3. Actualizar Barra de Memoria RAM
-        int ocupados = colaListos.getSize() + colaBloqueados.getSize();
-        if (procesoEnCPU != null) ocupados++; // Contar también el de CPU
+        // Barra de Memoria
+        int ocupados = kernel.getOcupacionMemoria();
+        int porcentaje = (ocupados * 100) / 10; // 10 es MAX_MEMORIA
+        if (porcentaje > 100) porcentaje = 100;
         
-        int porcentaje = (ocupados * 100) / MAX_MEMORIA;
         barraMemoria.setValue(porcentaje);
-        barraMemoria.setString(ocupados + "/" + MAX_MEMORIA + " Procesos (" + porcentaje + "%)");
+        barraMemoria.setString(ocupados + "/10 (" + porcentaje + "%)");
+        barraMemoria.setForeground(porcentaje >= 100 ? Color.RED : Color.GREEN);
         
-        if (porcentaje >= 100) barraMemoria.setForeground(Color.RED);
-        else barraMemoria.setForeground(Color.GREEN);
-        
-        // 4. ACTUALIZAR PANEL CPU (Running Process)
+        // Panel CPU
+        PCB procesoEnCPU = kernel.getCpu().getCurrentProcess();
         if (procesoEnCPU != null) {
             lblCpuId.setText(String.valueOf(procesoEnCPU.getId()));
             lblCpuEstado.setText(procesoEnCPU.getEstado());
             lblCpuPC.setText(String.valueOf(procesoEnCPU.getProgramCounter()));
             lblCpuMAR.setText(String.valueOf(procesoEnCPU.getMar()));
-            // lblCpuCiclos.setText(String.valueOf(procesoEnCPU.getCiclosRestantes())); // Si tienes este label
         } else {
             lblCpuId.setText("---");
-            lblCpuEstado.setText("IDLE"); // Ocioso
+            lblCpuEstado.setText("IDLE");
             lblCpuPC.setText("---");
             lblCpuMAR.setText("---");
         }
     }
-    // ---------------------------------------------------------
-    // ACCIONES DE BOTONES (Conectar en Design)
-    // ---------------------------------------------------------
-    // ---------------------------------------------------------
-    // ACCIONES DE BOTONES (Conectar en Design)
-    // ---------------------------------------------------------
 
+    private void llenarModelo(DefaultListModel<String> modelo, Queue<PCB> cola) {
+        modelo.clear();
+        // Nota: Si tu Queue no tiene iterador, usamos get(i)
+        for (int i = 0; i < cola.getSize(); i++) {
+            PCB p = cola.get(i);
+            if (p != null) modelo.addElement(p.toString());
+        }
+    }
+
+    // --- MOTOR DE SIMULACIÓN ---
+
+    private void iniciarMotor() {
+        if (ejecutando) return; 
+        ejecutando = true;
+        btnStart.setText("DETENER");
+
+        hiloSimulacion = new Thread(() -> {
+            while (ejecutando) {
+                try {
+                    cicloReloj++;
+                    
+                    // !!! AQUÍ OCURRE LA MAGIA !!!
+                    kernel.ejecutarCicloDelSistema(); 
+                    
+                    javax.swing.SwingUtilities.invokeLater(() -> actualizarInterfaz());
+
+                    int velocidad = 1000;
+                    try { velocidad = (Integer) spinnerVelocidad.getValue(); } catch (Exception e) {}
+                    Thread.sleep(velocidad); 
+
+                } catch (InterruptedException e) {
+                    System.out.println("Simulación interrumpida");
+                }
+            }
+        });
+        hiloSimulacion.start();
+    }
+
+    private void detenerMotor() {
+        ejecutando = false;
+        btnStart.setText("INICIAR");
+    }
+
+    // --- EVENTOS DE BOTONES (Asegúrate de conectarlos en Design) ---
+
+    private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {                                             
+        for (int i = 0; i < 20; i++) {
+            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
+            kernel.agregarProceso(nuevo); // ¡Mira qué limpio!
+        }
+        actualizarInterfaz();
+    }                                            
+
+    private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {                                         
+        if (!ejecutando) iniciarMotor();
+        else detenerMotor();
+    }                                        
 
     private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {                                              
         PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-        
-        // Calcular espacio en RAM (Listos + Bloqueados + El que esté en CPU)
-        int ocupados = colaListos.getSize() + colaBloqueados.getSize();
-        if (procesoEnCPU != null) ocupados++;
-
-        // Lógica de Memoria (Swap)
-        if (ocupados < MAX_MEMORIA) {
-            nuevo.setEstado("Listo");
-            colaListos.enqueue(nuevo);
-        } else {
-            // Si la RAM está llena, la emergencia va a Disco (o podrías programar expulsión)
-            nuevo.setEstado("Listo-Suspendido");
-            colaListosSusp.enqueue(nuevo);
-        }
-        
+        nuevo.setPrioridad(0); // Máxima prioridad
+        kernel.manejarInterrupcionHardware(); // El kernel sabe qué hacer
+        kernel.agregarProceso(nuevo);
         actualizarInterfaz();
-    }                                             
+    }
 
+    private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {                                                
+        String algo = (String) comboAlgoritmos.getSelectedItem();
+        kernel.setAlgoritmo(algo);
+        actualizarInterfaz();
+    }
+    
+    // ... (initComponents y variables generadas) ...
+}
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
