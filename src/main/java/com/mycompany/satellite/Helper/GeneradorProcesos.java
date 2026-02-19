@@ -11,23 +11,23 @@ public class GeneradorProcesos {
     
     private static final Random random = new Random();
 
-    /**
-     * Crea un proceso con valores aleatorios según reglas del PDF.
-     * @param id El ID único que tendrá el proceso.
-     * @return Un objeto PCB nuevo.
-     */
     public static PCB generarProcesoAleatorio(int id) {
-        // 1. Instrucciones (Ciclos): Aleatorio entre 10 y 50
         int instrucciones = 10 + random.nextInt(41); 
-        
-        // 2. Prioridad: Aleatorio entre 1 (Alta) y 3 (Baja)
         int prioridad = 1 + random.nextInt(3);
-        
-        // 3. Deadline: Debe ser mayor que las instrucciones.
-        // Aquí decimos que el deadline es entre el 150% y 300% del tiempo de ejecución.
-        // Ejemplo: Si dura 10 ciclos, el deadline será entre el ciclo 15 y 30 desde ahora.
         int deadline = (int) (instrucciones * (1.5 + random.nextDouble() * 1.5));
         
-        return new PCB(id, instrucciones, prioridad, deadline);
+        // --- Lógica de E/S ---
+        int cicloBloqueo = -1; // -1 significa "No se bloquea"
+        int tiempoBloqueo = 0;
+        
+        // 50% de probabilidad de tener bloqueo
+        if (random.nextDouble() > 0.5 && instrucciones > 5) { 
+            // Se bloqueará en algún momento intermedio
+            cicloBloqueo = 2 + random.nextInt(instrucciones - 4); 
+            tiempoBloqueo = 3 + random.nextInt(5); // Duración de 3 a 7 ciclos
+        }
+        
+        // Llamamos al constructor nuevo de PCB
+        return new PCB(id, instrucciones, prioridad, deadline, cicloBloqueo, tiempoBloqueo);
     }
 }

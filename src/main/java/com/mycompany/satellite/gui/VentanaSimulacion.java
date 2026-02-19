@@ -12,6 +12,10 @@ import java.awt.Color;
  */
 public class VentanaSimulacion extends javax.swing.JFrame {
     
+    // --- VARIABLES PARA ALGORITMOS ---
+    private int quantum = 5;          // Tiempo máximo para Round Robin
+    private int contadorQuantum = 0;  // Contador actual del proceso en CPU
+    
     private String algoritmoActual = "FCFS";
 
     // --- ESTRUCTURAS DE DATOS (Backend) ---
@@ -63,6 +67,62 @@ public class VentanaSimulacion extends javax.swing.JFrame {
 
         // 5. Carga Inicial Automática (Requisito PDF)
         cargarProcesosIniciales();
+    }
+    
+    /**
+     * Saca todos los procesos de la cola de listos, los ordena según el algoritmo
+     * seleccionado y los vuelve a meter.
+     */
+    private void reordenarColaListos() {
+        if (colaListos.isEmpty()) return;
+
+        // 1. Volcar la cola en un arreglo temporal
+        int n = colaListos.getSize();
+        PCB[] tempArray = new PCB[n];
+        for (int i = 0; i < n; i++) {
+            tempArray[i] = colaListos.dequeue();
+        }
+
+        // 2. Ordenar el arreglo (Burbuja) según el algoritmo
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = 0; j < n - i - 1; j++) {
+                boolean cambiar = false;
+                
+                PCB p1 = tempArray[j];
+                PCB p2 = tempArray[j + 1];
+
+                switch (algoritmoActual) {
+                    case "SPN": // Shortest Process Next (Por Ciclos Totales)
+                        if (p1.getCiclosTotales() > p2.getCiclosTotales()) cambiar = true;
+                        break;
+                        
+                    case "SRT": // Shortest Remaining Time (Por Ciclos Restantes)
+                        if (p1.getCiclosRestantes() > p2.getCiclosRestantes()) cambiar = true;
+                        break;
+                        
+                    case "HRRN": // Highest Response Ratio Next (Complejo, usaremos Prioridad por ahora)
+                    case "Prioridad": // Menor número = Mayor prioridad (1 gana a 3)
+                        if (p1.getPrioridad() > p2.getPrioridad()) cambiar = true;
+                        break;
+                        
+                    case "FCFS":
+                    case "Round Robin":
+                        // Estos NO se reordenan, respetan orden de llegada
+                        break;
+                }
+
+                if (cambiar) {
+                    PCB temp = tempArray[j];
+                    tempArray[j] = tempArray[j + 1];
+                    tempArray[j + 1] = temp;
+                }
+            }
+        }
+
+        // 3. Regresar todo a la cola ya ordenado
+        for (int i = 0; i < n; i++) {
+            colaListos.enqueue(tempArray[i]);
+        }
     }
     
     private void personalizarDiseño() {
@@ -575,99 +635,156 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     }//GEN-LAST:event_btnStartActionPerformed
 
     private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboAlgoritmosActionPerformed
-         // 1. Capturar qué seleccionó el usuario
-        algoritmoActual = (String) comboAlgoritmos.getSelectedItem(); // <--- CORREGIDO
-        System.out.println(">>> Cambio de Política: " + algoritmoActual);
+        algoritmoActual = (String) comboAlgoritmos.getSelectedItem();
+        System.out.println(">>> Algoritmo cambiado a: " + algoritmoActual);
         
-        switch (algoritmoActual) {
-            case "FCFS":
-                break;
-                
-            case "Round Robin":
-                break;
-                
-            case "SPN": // Shortest Process Next
-                break;
-                
-            case "SRT":
-                break;
-                
-            case "HRRN":
-                break;
-        }
-        
-        // Refrescar la pantalla para ver si el orden cambió
+        // Si cambiamos a un algoritmo con ordenamiento, reordenamos YA.
+        reordenarColaListos();
         actualizarInterfaz();
     }//GEN-LAST:event_comboAlgoritmosActionPerformed
         private void iniciarMotor() {
-        if (ejecutando) return; 
+            if (ejecutando) return; 
+            ejecutando = true;
+            btnStart.setText("DETENER");
 
-        ejecutando = true;
-        btnStart.setText("DETENER");
+            hiloSimulacion = new Thread(() -> {
+                while (ejecutando) {
+                    try {
+                        cicloReloj++;
 
-        hiloSimulacion = new Thread(() -> {
-            while (ejecutando) {
-                try {
-                    // 1. Avanzar reloj
-                    cicloReloj++;
-                    
-                    // --- LÓGICA DEL KERNEL (SIMULADA) ---
-                    
-                    // A. Si no hay nadie en CPU, buscamos en la cola de Listos
-                    if (procesoEnCPU == null) {
-                        if (!colaListos.isEmpty()) {
-                            procesoEnCPU = colaListos.dequeue();
-                            procesoEnCPU.setEstado("Ejecucion");
+                        // 1. Gestionar Bloqueados
+                        gestionarBloqueados(); // (Asegúrate de tener este método del paso anterior)
+
+                        // 2. Reordenar cola si es necesario (Para algoritmos dinámicos como SRT)
+                        if (algoritmoActual.equals("SRT") || algoritmoActual.equals("Prioridad")) {
+                            reordenarColaListos();
                         }
-                    }
-                    
-                    // B. Si hay alguien en CPU, lo procesamos
-                    if (procesoEnCPU != null) {
-                        // Simular trabajo: Aumentar PC y MAR
-                        procesoEnCPU.setProgramCounter(procesoEnCPU.getProgramCounter() + 1);
-                        procesoEnCPU.setMar(procesoEnCPU.getMar() + 1);
-                        procesoEnCPU.setCiclosRestantes(procesoEnCPU.getCiclosRestantes() - 1);
-                        
-                        // C. Verificar si terminó
-                        if (procesoEnCPU.getCiclosRestantes() <= 0) {
-                            procesoEnCPU.setEstado("Terminado");
-                            // Aquí podrías guardarlo en una lista de terminados o archivo
-                            procesoEnCPU = null; // Liberar CPU
-                            
-                            // D. Intentar traer alguien del Swap (Disco) a RAM si hay espacio
-                            if (!colaListosSusp.isEmpty()) {
-                                PCB recuperado = colaListosSusp.dequeue();
-                                recuperado.setEstado("Listo");
-                                colaListos.enqueue(recuperado);
+
+                        // 3. EXPROPIACIÓN (SRT y Prioridades)
+                        // Si hay alguien en CPU, pero en la cola hay alguien mejor... cambiamos.
+                        if (procesoEnCPU != null && !colaListos.isEmpty()) {
+                            PCB mejorCandidato = colaListos.peek();
+                            boolean expropiar = false;
+
+                            if (algoritmoActual.equals("SRT")) {
+                                // Si el de la cola es más corto que el actual -> Cambio
+                                if (mejorCandidato.getCiclosRestantes() < procesoEnCPU.getCiclosRestantes()) expropiar = true;
+                            } else if (algoritmoActual.equals("Prioridad")) {
+                                // Si el de la cola es más importante (menor valor) -> Cambio
+                                if (mejorCandidato.getPrioridad() < procesoEnCPU.getPrioridad()) expropiar = true;
+                            }
+
+                            if (expropiar) {
+                                procesoEnCPU.setEstado("Listo");
+                                colaListos.enqueue(procesoEnCPU); // Devolver a la cola
+                                procesoEnCPU = null; // Liberar CPU para que el siguiente entre abajo
+                                reordenarColaListos(); // Reordenar para que el viejo quede en su lugar
+                                contadorQuantum = 0; // Resetear quantum
                             }
                         }
+
+                        // 4. Despachar (Meter a CPU)
+                        if (procesoEnCPU == null) {
+                            if (!colaListos.isEmpty()) {
+                                procesoEnCPU = colaListos.dequeue();
+                                procesoEnCPU.setEstado("Ejecucion");
+                                contadorQuantum = 0; // Resetear quantum al entrar
+                            }
+                        }
+
+                        // 5. Ejecutar Proceso
+                        if (procesoEnCPU != null) {
+                            // --- ROUND ROBIN LOGIC ---
+                            if (algoritmoActual.equals("Round Robin")) {
+                                if (contadorQuantum >= quantum) {
+                                    // Se acabó el tiempo!
+                                    procesoEnCPU.setEstado("Listo");
+                                    colaListos.enqueue(procesoEnCPU);
+                                    procesoEnCPU = null; // Sacar de CPU
+                                    contadorQuantum = 0;
+                                    // Saltamos el resto del ciclo para que entre el siguiente inmediatamente
+                                    // o esperamos al siguiente ciclo de reloj (decisión de diseño).
+                                    // Por simplicidad, esperaremos al siguiente ciclo.
+                                } else {
+                                    ejecutarCicloProceso(); // Método auxiliar para no repetir código
+                                    contadorQuantum++;
+                                }
+                            } else {
+                                // FCFS, SPN, SRT (Sin quantum)
+                                ejecutarCicloProceso();
+                            }
+                        }
+
+                        // Actualizar GUI
+                        javax.swing.SwingUtilities.invokeLater(() -> actualizarInterfaz());
+
+                        // Velocidad
+                        int velocidad = 1000;
+                        try { velocidad = (Integer) spinnerVelocidad.getValue(); } catch (Exception e) {}
+                        Thread.sleep(velocidad); 
+
+                    } catch (InterruptedException e) {
+                        System.out.println("Simulación interrumpida");
                     }
-                    // -------------------------------------
+                }
+            });
+            hiloSimulacion.start();
+        }
 
-                    // 2. Actualizar visuales
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        actualizarInterfaz();
-                    });
+        // Método auxiliar para limpiar el código de arriba
+        private void ejecutarCicloProceso() {
+            if (procesoEnCPU == null) return;
 
-                    int velocidad = 1000; // Valor por defecto
-                    try {
-                        // Obtenemos el valor del diseño visual
-                        velocidad = (Integer) spinnerVelocidad.getValue();
-                    } catch (Exception e) {
-                        velocidad = 1000; // Si falla, usamos 1 seg
-                    }
+            // Chequeo de E/S (El que hicimos antes)
+            if (procesoEnCPU.getCicloIrrupccionES() == procesoEnCPU.getCiclosRestantes()) {
+                procesoEnCPU.setEstado("Bloqueado");
+                colaBloqueados.enqueue(procesoEnCPU);
+                procesoEnCPU = null;
+                contadorQuantum = 0;
+                return;
+            }
 
-                    Thread.sleep(velocidad); 
+            // Ejecución normal
+            procesoEnCPU.setProgramCounter(procesoEnCPU.getProgramCounter() + 1);
+            procesoEnCPU.setMar(procesoEnCPU.getMar() + 1);
+            procesoEnCPU.setCiclosRestantes(procesoEnCPU.getCiclosRestantes() - 1);
 
-                } catch (InterruptedException e) {
-                    System.out.println("Simulación interrumpida");
+            if (procesoEnCPU.getCiclosRestantes() <= 0) {
+                procesoEnCPU.setEstado("Terminado");
+                procesoEnCPU = null;
+                contadorQuantum = 0;
+
+                // Swap In
+                if (!colaListosSusp.isEmpty()) {
+                    PCB recuperado = colaListosSusp.dequeue();
+                    recuperado.setEstado("Listo");
+                    colaListos.enqueue(recuperado);
+                    reordenarColaListos(); // Reordenar al traer uno nuevo
                 }
             }
-        });
+        }
+    private void gestionarBloqueados() {
+        if (colaBloqueados.isEmpty()) return;
         
-        hiloSimulacion.start();
+        // Recorremos la cola como un ciclo
+        int tamano = colaBloqueados.getSize();
+        
+        for (int i = 0; i < tamano; i++) {
+            PCB p = colaBloqueados.dequeue();
+            
+            // Restar tiempo de E/S
+            p.setLongitudES(p.getLongitudES() - 1);
+            
+            if (p.getLongitudES() <= 0) {
+                // Terminó E/S, vuelve a Listo
+                p.setEstado("Listo");
+                colaListos.enqueue(p);
+            } else {
+                // Sigue bloqueado, vuelve a la cola
+                colaBloqueados.enqueue(p);
+            }
+        }
     }
-
     /**
      * Apaga el motor
      */
