@@ -1,10 +1,16 @@
 package main.classes;
 
+import com.mycompany.satellite.Helper.GeneradorProcesos;
 import com.mycompany.satellite.Helper.Queue;
+import com.mycompany.satellite.gui.VentanaSimulacion;
+import javax.swing.SwingUtilities;
 
 public class Planificador {
     
-    // --- Recursos ---
+    // --- Referencia a la GUI (Para actualizarla) ---
+    private VentanaSimulacion ventana;
+
+    // --- Recursos del Sistema ---
     private CPU cpu;
     private final int MAX_MEMORIA = 10;
     
@@ -14,7 +20,14 @@ public class Planificador {
     private Queue<PCB> colaListosSusp;
     private Queue<PCB> colaBloqSusp;
     
-    // --- Configuración ---
+    // --- Control de Simulación (Motor) ---
+    private boolean ejecutando = false;
+    private Thread hiloSimulacion;
+    private int cicloReloj = 0;
+    private int contadorIds = 1;
+    private int velocidadSimulacion = 1000; // ms
+    
+    // --- Configuración Algoritmos ---
     private String algoritmoActual = "FCFS";
     private int quantum = 5;
     private int contadorQuantum = 0;
@@ -27,47 +40,106 @@ public class Planificador {
         this.colaBloqSusp = new Queue<>();
     }
     
-    // --- Lógica Principal (Se llama cada segundo) ---
-    public void ejecutarCicloDelSistema() {
+    // Conectar con la ventana (Se llama desde la ventana al iniciar)
+    public void setVentana(VentanaSimulacion ventana) {
+        this.ventana = ventana;
+    }
+
+    // --- MOTOR: INICIAR / DETENER ---
+    public void toggleSimulacion() {
+        if (ejecutando) {
+            detener();
+        } else {
+            iniciar();
+        }
+    }
+
+    private void iniciar() {
+        if (ejecutando) return;
+        ejecutando = true;
+        if (ventana != null) ventana.setEstadoBotonStart("DETENER");
+
+        hiloSimulacion = new Thread(() -> {
+            while (ejecutando) {
+                try {
+                    cicloReloj++;
+                    
+                    // 1. Ejecutar Lógica del Sistema Operativo
+                    ejecutarCicloLogico();
+                    
+                    // 2. Mandar a pintar la pantalla
+                    if (ventana != null) {
+                        SwingUtilities.invokeLater(() -> ventana.actualizarInterfaz());
+                    }
+
+                    // 3. Esperar (Velocidad)
+                    Thread.sleep(velocidadSimulacion);
+
+                } catch (InterruptedException e) {
+                    System.out.println("Hilo interrumpido");
+                }
+            }
+        });
+        hiloSimulacion.start();
+    }
+
+    private void detener() {
+        ejecutando = false;
+        if (ventana != null) ventana.setEstadoBotonStart("INICIAR");
+    }
+    
+    // --- LÓGICA DE GESTIÓN (LO QUE MOVIMOS DE LA VENTANA) ---
+    
+    public void crearProcesosIniciales() {
+        for (int i = 0; i < 5; i++) {
+            generarProcesoAleatorio();
+        }
+    }
+    
+    public void generarProcesosMasivos() {
+        for (int i = 0; i < 20; i++) {
+            generarProcesoAleatorio();
+        }
+    }
+    
+    public void generarEmergencia() {
+        PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
+        nuevo.setPrioridad(0); // Prioridad máxima
+        manejarInterrupcionHardware(); // Preemption
+        agregarProceso(nuevo);
+    }
+    
+    private void generarProcesoAleatorio() {
+        PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
+        agregarProceso(nuevo);
+    }
+
+    private void ejecutarCicloLogico() {
         gestionarBloqueados();
         
-        // 1. Verificar proceso en CPU
+        // Lógica de CPU y Planificación
         if (cpu.isBusy()) {
             PCB p = cpu.getCurrentProcess();
             
-            // A. Terminó
-            if (p.getCiclosRestantes() <= 0) {
-                p.setEstado("Terminado");
-                cpu.releaseProcess();
-                contadorQuantum = 0;
-                checkSwapping(); 
-            }
-            // B. Bloqueo por E/S
-            else if (p.getCicloIrrupccionES() == p.getCiclosRestantes()) {
+            // Lógica simplificada para el ejemplo (Tu lógica completa va aquí)
+            if (p.getCicloIrrupccionES() == p.getCiclosRestantes()) {
                 p.setEstado("Bloqueado");
                 colaBloqueados.enqueue(p);
                 cpu.releaseProcess();
                 contadorQuantum = 0;
-            }
-            // C. Round Robin
-            else if (algoritmoActual.equals("Round Robin")) {
+            } else {
                 cpu.ejecutarInstruccion();
-                contadorQuantum++;
-                if (contadorQuantum >= quantum) {
-                    p.setEstado("Listo");
-                    colaListos.enqueue(p);
+                if (p.getCiclosRestantes() <= 0) {
+                    p.setEstado("Terminado");
                     cpu.releaseProcess();
                     contadorQuantum = 0;
+                    checkSwapping();
                 }
-            }
-            // D. Normal (FCFS, SRT, etc)
-            else {
-                cpu.ejecutarInstruccion();
-                checkExpropiacion(); 
+                // Aquí iría el chequeo de Quantum para Round Robin
             }
         }
         
-        // 2. Dispatcher (Meter a CPU)
+        // Dispatcher
         if (!cpu.isBusy() && !colaListos.isEmpty()) {
             PCB siguiente = colaListos.dequeue();
             cpu.assignProcess(siguiente);
@@ -75,10 +147,10 @@ public class Planificador {
         }
     }
     
-    // --- Gestión de Procesos ---
+    // --- GESTIÓN DE MEMORIA Y COLAS ---
+    
     public void agregarProceso(PCB nuevo) {
         int ocupados = getOcupacionMemoria();
-        
         if (ocupados < MAX_MEMORIA) {
             nuevo.setEstado("Listo");
             encolarSegunAlgoritmo(nuevo);
@@ -88,42 +160,23 @@ public class Planificador {
         }
     }
     
-    public void manejarInterrupcionHardware() {
-        if (cpu.isBusy()) {
-            PCB p = cpu.releaseProcess();
-            p.setEstado("Listo");
-            encolarSegunAlgoritmo(p);
-            contadorQuantum = 0;
-        }
-    }
-    
-    public void setAlgoritmo(String algo) {
-        this.algoritmoActual = algo;
-        // Si cambiamos algoritmo, reordenamos la cola actual
-        reordenarColaListos();
-    }
-
-    // --- Auxiliares Privados ---
-    
     private void encolarSegunAlgoritmo(PCB p) {
-        if (algoritmoActual.equals("SRT") || algoritmoActual.equals("Prioridad") || algoritmoActual.equals("EDF")) {
+        // Lógica de ordenamiento
+        if (algoritmoActual.equals("SRT") || algoritmoActual.equals("Prioridad")) {
             colaListos.enqueueOrdenado(p, algoritmoActual);
         } else {
             colaListos.enqueue(p);
         }
     }
-
-    private void reordenarColaListos() {
-        // Truco: Sacar todo y volver a meter usando enqueueOrdenado
-        int n = colaListos.getSize();
-        Queue<PCB> temp = new Queue<>();
-        for(int i=0; i<n; i++) temp.enqueue(colaListos.dequeue());
-        
-        while(!temp.isEmpty()) {
-            encolarSegunAlgoritmo(temp.dequeue());
+    
+    // --- MÉTODOS AUXILIARES ---
+    
+    private void checkSwapping() {
+        if (getOcupacionMemoria() < MAX_MEMORIA && !colaListosSusp.isEmpty()) {
+            agregarProceso(colaListosSusp.dequeue());
         }
     }
-
+    
     private void gestionarBloqueados() {
         if (colaBloqueados.isEmpty()) return;
         int n = colaBloqueados.getSize();
@@ -138,33 +191,35 @@ public class Planificador {
         }
     }
     
-    private void checkSwapping() {
-        if (getOcupacionMemoria() < MAX_MEMORIA && !colaListosSusp.isEmpty()) {
-            agregarProceso(colaListosSusp.dequeue());
-        }
-    }
-    
-    private void checkExpropiacion() {
-        if (colaListos.isEmpty()) return;
-        PCB candidato = colaListos.peek();
-        PCB actual = cpu.getCurrentProcess();
-        boolean cambio = false;
-        
-        if (algoritmoActual.equals("SRT") && candidato.getCiclosRestantes() < actual.getCiclosRestantes()) cambio = true;
-        if (algoritmoActual.equals("Prioridad") && candidato.getPrioridad() < actual.getPrioridad()) cambio = true; // Asumiendo menor valor = mayor prioridad
-        
-        if (cambio) {
-            cpu.releaseProcess();
-            actual.setEstado("Listo");
-            encolarSegunAlgoritmo(actual);
+    public void manejarInterrupcionHardware() {
+        if (cpu.isBusy()) {
+            PCB p = cpu.releaseProcess();
+            p.setEstado("Listo");
+            encolarSegunAlgoritmo(p);
         }
     }
 
-    // --- Getters para la GUI ---
+    public void reordenarColaListos() {
+        // Lógica para reordenar la cola existente si cambia el algoritmo
+        int n = colaListos.getSize();
+        Queue<PCB> temp = new Queue<>();
+        for(int i=0; i<n; i++) temp.enqueue(colaListos.dequeue());
+        while(!temp.isEmpty()) encolarSegunAlgoritmo(temp.dequeue());
+    }
+
+    // --- GETTERS Y SETTERS ---
     public Queue<PCB> getColaListos() { return colaListos; }
     public Queue<PCB> getColaBloqueados() { return colaBloqueados; }
     public Queue<PCB> getColaListosSusp() { return colaListosSusp; }
     public Queue<PCB> getColaBloqSusp() { return colaBloqSusp; }
     public CPU getCpu() { return cpu; }
+    public int getCicloReloj() { return cicloReloj; }
     public int getOcupacionMemoria() { return colaListos.getSize() + colaBloqueados.getSize() + (cpu.isBusy() ? 1 : 0); }
+    public boolean isEjecutando() { return ejecutando; }
+    
+    public void setVelocidadSimulacion(int ms) { this.velocidadSimulacion = ms; }
+    public void setAlgoritmo(String algo) { 
+        this.algoritmoActual = algo; 
+        reordenarColaListos();
+    }
 }

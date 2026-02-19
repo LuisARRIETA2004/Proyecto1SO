@@ -1,18 +1,15 @@
-// Importaciones necesarias
-                                         
 package com.mycompany.satellite.gui;
 
-import com.mycompany.satellite.Helper.GeneradorProcesos;
 import com.mycompany.satellite.Helper.Queue;
 import main.classes.PCB;
-import main.classes.Planificador; 
+import main.classes.Planificador;
 import javax.swing.DefaultListModel;
 import java.awt.Color;
 
 public class VentanaSimulacion extends javax.swing.JFrame {
 
-    // --- EL CEREBRO DEL SISTEMA ---
-    private Planificador kernel; // Ahora usamos tu clase Planificador
+    // --- EL CEREBRO ---
+    private Planificador kernel;
 
     // --- MODELOS VISUALES ---
     private DefaultListModel<String> modeloListos = new DefaultListModel<>();
@@ -20,15 +17,10 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     private DefaultListModel<String> modeloListosSusp = new DefaultListModel<>();
     private DefaultListModel<String> modeloBloqSusp = new DefaultListModel<>();
 
-    // --- VARIABLES DE CONTROL ---
-    private int contadorIds = 1;
-    private int cicloReloj = 0;
-    private boolean ejecutando = false; 
-    private Thread hiloSimulacion;      
-
     public VentanaSimulacion() {
         // 1. Inicializar el Kernel
         kernel = new Planificador();
+        kernel.setVentana(this); // ¡Conectamos la ventana al kernel!
 
         // 2. GUI (NetBeans)
         initComponents();
@@ -42,49 +34,36 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         listBloqueadosSuspendidos.setModel(modeloBloqSusp);
 
         // 4. Carga Inicial
-        cargarProcesosIniciales();
-    }
-    
-    private void personalizarDiseño() {
-        this.setLocationRelativeTo(null);
-        this.getContentPane().setBackground(new Color(0, 0, 51));
+        kernel.crearProcesosIniciales();
     }
 
-    // --- LÓGICA DE INTERFAZ ---
-
-    private void cargarProcesosIniciales() {
-        for (int i = 0; i < 5; i++) {
-            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-            kernel.agregarProceso(nuevo); // Delegamos al Kernel
-        }
-        actualizarInterfaz();
-    }
+    // --- MÉTODOS PÚBLICOS (El Kernel los usa para pintar) ---
 
     public void actualizarInterfaz() {
-        lblReloj.setText("MISSION CLOCK: Cycle " + cicloReloj);
+        // Reloj
+        lblReloj.setText("MISSION CLOCK: Cycle " + kernel.getCicloReloj());
 
-        // Leemos las colas DESDE EL KERNEL
+        // Listas
         llenarModelo(modeloListos, kernel.getColaListos());
         llenarModelo(modeloBloqueados, kernel.getColaBloqueados());
         llenarModelo(modeloListosSusp, kernel.getColaListosSusp());
         llenarModelo(modeloBloqSusp, kernel.getColaBloqSusp());
 
-        // Barra de Memoria
+        // Memoria
         int ocupados = kernel.getOcupacionMemoria();
-        int porcentaje = (ocupados * 100) / 10; // 10 es MAX_MEMORIA
+        int porcentaje = (ocupados * 100) / 10;
         if (porcentaje > 100) porcentaje = 100;
-        
         barraMemoria.setValue(porcentaje);
         barraMemoria.setString(ocupados + "/10 (" + porcentaje + "%)");
         barraMemoria.setForeground(porcentaje >= 100 ? Color.RED : Color.GREEN);
         
-        // Panel CPU
-        PCB procesoEnCPU = kernel.getCpu().getCurrentProcess();
-        if (procesoEnCPU != null) {
-            lblCpuId.setText(String.valueOf(procesoEnCPU.getId()));
-            lblCpuEstado.setText(procesoEnCPU.getEstado());
-            lblCpuPC.setText(String.valueOf(procesoEnCPU.getProgramCounter()));
-            lblCpuMAR.setText(String.valueOf(procesoEnCPU.getMar()));
+        // CPU
+        PCB p = kernel.getCpu().getCurrentProcess();
+        if (p != null) {
+            lblCpuId.setText(String.valueOf(p.getId()));
+            lblCpuEstado.setText(p.getEstado());
+            lblCpuPC.setText(String.valueOf(p.getProgramCounter()));
+            lblCpuMAR.setText(String.valueOf(p.getMar()));
         } else {
             lblCpuId.setText("---");
             lblCpuEstado.setText("IDLE");
@@ -92,81 +71,50 @@ public class VentanaSimulacion extends javax.swing.JFrame {
             lblCpuMAR.setText("---");
         }
     }
+    
+    public void setEstadoBotonStart(String texto) {
+        btnStart.setText(texto);
+    }
 
     private void llenarModelo(DefaultListModel<String> modelo, Queue<PCB> cola) {
         modelo.clear();
-        // Nota: Si tu Queue no tiene iterador, usamos get(i)
         for (int i = 0; i < cola.getSize(); i++) {
             PCB p = cola.get(i);
             if (p != null) modelo.addElement(p.toString());
         }
     }
 
-    // --- MOTOR DE SIMULACIÓN ---
-
-    private void iniciarMotor() {
-        if (ejecutando) return; 
-        ejecutando = true;
-        btnStart.setText("DETENER");
-
-        hiloSimulacion = new Thread(() -> {
-            while (ejecutando) {
-                try {
-                    cicloReloj++;
-                    
-                    // !!! AQUÍ OCURRE LA MAGIA !!!
-                    kernel.ejecutarCicloDelSistema(); 
-                    
-                    javax.swing.SwingUtilities.invokeLater(() -> actualizarInterfaz());
-
-                    int velocidad = 1000;
-                    try { velocidad = (Integer) spinnerVelocidad.getValue(); } catch (Exception e) {}
-                    Thread.sleep(velocidad); 
-
-                } catch (InterruptedException e) {
-                    System.out.println("Simulación interrumpida");
-                }
-            }
-        });
-        hiloSimulacion.start();
-    }
-
-    private void detenerMotor() {
-        ejecutando = false;
-        btnStart.setText("INICIAR");
-    }
-
-    // --- EVENTOS DE BOTONES (Asegúrate de conectarlos en Design) ---
+    // --- EVENTOS DE BOTONES (Solo delegan al Kernel) ---
 
     private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {                                             
-        for (int i = 0; i < 20; i++) {
-            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-            kernel.agregarProceso(nuevo); // ¡Mira qué limpio!
-        }
+        kernel.generarProcesosMasivos();
         actualizarInterfaz();
     }                                            
 
     private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        if (!ejecutando) iniciarMotor();
-        else detenerMotor();
+        // Enviamos la velocidad actual antes de iniciar/parar
+        try {
+            int velocidad = (Integer) spinnerVelocidad.getValue();
+            kernel.setVelocidadSimulacion(velocidad);
+        } catch (Exception e) {}
+        
+        kernel.toggleSimulacion();
     }                                        
 
     private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {                                              
-        PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-        nuevo.setPrioridad(0); // Máxima prioridad
-        kernel.manejarInterrupcionHardware(); // El kernel sabe qué hacer
-        kernel.agregarProceso(nuevo);
+        kernel.generarEmergencia();
         actualizarInterfaz();
     }
 
     private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {                                                
         String algo = (String) comboAlgoritmos.getSelectedItem();
+        System.out.println("Algoritmo cambiado a: " + algo);
         kernel.setAlgoritmo(algo);
         actualizarInterfaz();
     }
     
-    // ... (initComponents y variables generadas) ...
-}
+    // --- GENERATED CODE (No tocar abajo) ---
+
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -548,206 +496,79 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnGenerar20ActionPerformed
-         System.out.println("--- Generando lote de 20 procesos ---");
-
-        for (int i = 0; i < 20; i++) {
-            // 1. Crear el proceso usando la clase Helper
-            main.classes.PCB nuevo = com.mycompany.satellite.Helper.GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-
-            // 2. Calcular cuántos procesos hay actualmente en RAM
-            int procesosEnRAM = colaListos.getSize() + colaBloqueados.getSize();
-
-            // 3. Decidir dónde guardar el proceso
-            if (procesosEnRAM < MAX_MEMORIA) {
-                // Si hay espacio en RAM (menor a 10), va a la cola de Listos
-                nuevo.setEstado("Listo");
-                colaListos.enqueue(nuevo);
-            } else {
-                // Si la RAM está llena, va al Disco (Swap) -> Listo-Suspendido
-                nuevo.setEstado("Listo-Suspendido");
-                colaListosSusp.enqueue(nuevo);
-            }
-        }
-
-        // 4. Actualizar toda la interfaz visual
+                                           
+        // CORRECCIÓN: Ya no calculamos nada aquí. Se lo pedimos al Kernel.
+        kernel.generarProcesosMasivos();
         actualizarInterfaz();
     }//GEN-LAST:event_btnGenerar20ActionPerformed
 
     private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStartActionPerformed
-        if (!ejecutando) {
-            iniciarMotor();
+        try {
+            int velocidad = (Integer) spinnerVelocidad.getValue();
+            kernel.setVelocidadSimulacion(velocidad);
+        } catch (Exception e) {}
+        
+        kernel.toggleSimulacion();
+        
+        // Actualizamos el texto del botón
+        if (kernel.isEjecutando()) {
+            btnStart.setText("DETENER");
         } else {
-            detenerMotor();
-        }        // TODO add your handling code here:
+            btnStart.setText("INICIAR");
+        }
     }//GEN-LAST:event_btnStartActionPerformed
 
     private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboAlgoritmosActionPerformed
-        algoritmoActual = (String) comboAlgoritmos.getSelectedItem();
-        System.out.println(">>> Algoritmo cambiado a: " + algoritmoActual);
+        String algo = (String) comboAlgoritmos.getSelectedItem();
+        System.out.println(">>> Algoritmo cambiado a: " + algo);
         
-        // Si cambiamos a un algoritmo con ordenamiento, reordenamos YA.
-        reordenarColaListos();
+        kernel.setAlgoritmo(algo);
         actualizarInterfaz();
     }//GEN-LAST:event_comboAlgoritmosActionPerformed
-        private void iniciarMotor() {
-            if (ejecutando) return; 
-            ejecutando = true;
-            btnStart.setText("DETENER");
+        // --- MOTOR DE SIMULACIÓN ---
 
-            hiloSimulacion = new Thread(() -> {
-                while (ejecutando) {
-                    try {
-                        cicloReloj++;
+    private void iniciarMotor() {
+        if (ejecutando) return; 
+        ejecutando = true;
+        btnStart.setText("DETENER");
 
-                        // 1. Gestionar Bloqueados
-                        gestionarBloqueados(); // (Asegúrate de tener este método del paso anterior)
+        hiloSimulacion = new Thread(() -> {
+            while (ejecutando) {
+                try {
+                    cicloReloj++;
+                    
+                    // EL KERNEL HACE EL TRABAJO DURO
+                    kernel.ejecutarCicloDelSistema(); 
+                    
+                    // Actualizamos la pantalla
+                    javax.swing.SwingUtilities.invokeLater(() -> actualizarInterfaz());
 
-                        // 2. Reordenar cola si es necesario (Para algoritmos dinámicos como SRT)
-                        if (algoritmoActual.equals("SRT") || algoritmoActual.equals("Prioridad")) {
-                            reordenarColaListos();
-                        }
+                    // Control de velocidad
+                    int velocidad = 1000;
+                    try { 
+                        velocidad = (Integer) spinnerVelocidad.getValue(); 
+                    } catch (Exception e) {}
+                    Thread.sleep(velocidad); 
 
-                        // 3. EXPROPIACIÓN (SRT y Prioridades)
-                        // Si hay alguien en CPU, pero en la cola hay alguien mejor... cambiamos.
-                        if (procesoEnCPU != null && !colaListos.isEmpty()) {
-                            PCB mejorCandidato = colaListos.peek();
-                            boolean expropiar = false;
-
-                            if (algoritmoActual.equals("SRT")) {
-                                // Si el de la cola es más corto que el actual -> Cambio
-                                if (mejorCandidato.getCiclosRestantes() < procesoEnCPU.getCiclosRestantes()) expropiar = true;
-                            } else if (algoritmoActual.equals("Prioridad")) {
-                                // Si el de la cola es más importante (menor valor) -> Cambio
-                                if (mejorCandidato.getPrioridad() < procesoEnCPU.getPrioridad()) expropiar = true;
-                            }
-
-                            if (expropiar) {
-                                procesoEnCPU.setEstado("Listo");
-                                colaListos.enqueue(procesoEnCPU); // Devolver a la cola
-                                procesoEnCPU = null; // Liberar CPU para que el siguiente entre abajo
-                                reordenarColaListos(); // Reordenar para que el viejo quede en su lugar
-                                contadorQuantum = 0; // Resetear quantum
-                            }
-                        }
-
-                        // 4. Despachar (Meter a CPU)
-                        if (procesoEnCPU == null) {
-                            if (!colaListos.isEmpty()) {
-                                procesoEnCPU = colaListos.dequeue();
-                                procesoEnCPU.setEstado("Ejecucion");
-                                contadorQuantum = 0; // Resetear quantum al entrar
-                            }
-                        }
-
-                        // 5. Ejecutar Proceso
-                        if (procesoEnCPU != null) {
-                            // --- ROUND ROBIN LOGIC ---
-                            if (algoritmoActual.equals("Round Robin")) {
-                                if (contadorQuantum >= quantum) {
-                                    // Se acabó el tiempo!
-                                    procesoEnCPU.setEstado("Listo");
-                                    colaListos.enqueue(procesoEnCPU);
-                                    procesoEnCPU = null; // Sacar de CPU
-                                    contadorQuantum = 0;
-                                    // Saltamos el resto del ciclo para que entre el siguiente inmediatamente
-                                    // o esperamos al siguiente ciclo de reloj (decisión de diseño).
-                                    // Por simplicidad, esperaremos al siguiente ciclo.
-                                } else {
-                                    ejecutarCicloProceso(); // Método auxiliar para no repetir código
-                                    contadorQuantum++;
-                                }
-                            } else {
-                                // FCFS, SPN, SRT (Sin quantum)
-                                ejecutarCicloProceso();
-                            }
-                        }
-
-                        // Actualizar GUI
-                        javax.swing.SwingUtilities.invokeLater(() -> actualizarInterfaz());
-
-                        // Velocidad
-                        int velocidad = 1000;
-                        try { velocidad = (Integer) spinnerVelocidad.getValue(); } catch (Exception e) {}
-                        Thread.sleep(velocidad); 
-
-                    } catch (InterruptedException e) {
-                        System.out.println("Simulación interrumpida");
-                    }
-                }
-            });
-            hiloSimulacion.start();
-        }
-
-        // Método auxiliar para limpiar el código de arriba
-        private void ejecutarCicloProceso() {
-            if (procesoEnCPU == null) return;
-
-            // Chequeo de E/S (El que hicimos antes)
-            if (procesoEnCPU.getCicloIrrupccionES() == procesoEnCPU.getCiclosRestantes()) {
-                procesoEnCPU.setEstado("Bloqueado");
-                colaBloqueados.enqueue(procesoEnCPU);
-                procesoEnCPU = null;
-                contadorQuantum = 0;
-                return;
-            }
-
-            // Ejecución normal
-            procesoEnCPU.setProgramCounter(procesoEnCPU.getProgramCounter() + 1);
-            procesoEnCPU.setMar(procesoEnCPU.getMar() + 1);
-            procesoEnCPU.setCiclosRestantes(procesoEnCPU.getCiclosRestantes() - 1);
-
-            if (procesoEnCPU.getCiclosRestantes() <= 0) {
-                procesoEnCPU.setEstado("Terminado");
-                procesoEnCPU = null;
-                contadorQuantum = 0;
-
-                // Swap In
-                if (!colaListosSusp.isEmpty()) {
-                    PCB recuperado = colaListosSusp.dequeue();
-                    recuperado.setEstado("Listo");
-                    colaListos.enqueue(recuperado);
-                    reordenarColaListos(); // Reordenar al traer uno nuevo
+                } catch (InterruptedException e) {
+                    System.out.println("Simulación interrumpida");
                 }
             }
-        }
-    private void gestionarBloqueados() {
-        if (colaBloqueados.isEmpty()) return;
-        
-        // Recorremos la cola como un ciclo
-        int tamano = colaBloqueados.getSize();
-        
-        for (int i = 0; i < tamano; i++) {
-            PCB p = colaBloqueados.dequeue();
-            
-            // Restar tiempo de E/S
-            p.setLongitudES(p.getLongitudES() - 1);
-            
-            if (p.getLongitudES() <= 0) {
-                // Terminó E/S, vuelve a Listo
-                p.setEstado("Listo");
-                colaListos.enqueue(p);
-            } else {
-                // Sigue bloqueado, vuelve a la cola
-                colaBloqueados.enqueue(p);
-            }
-        }
+        });
+        hiloSimulacion.start();
     }
-    /**
-     * Apaga el motor
-     */
+
     private void detenerMotor() {
         ejecutando = false;
         btnStart.setText("INICIAR");
     }
+
     /**
      * @param args the command line arguments
      */
     public static void main(String args[]) {
         /* Set the Nimbus look and feel */
         //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
         try {
             for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {
@@ -755,13 +576,7 @@ public class VentanaSimulacion extends javax.swing.JFrame {
                     break;
                 }
             }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
             java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
         //</editor-fold>
