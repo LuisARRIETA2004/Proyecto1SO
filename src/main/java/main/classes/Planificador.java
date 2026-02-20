@@ -70,6 +70,13 @@ public class Planificador {
 
         hiloSimulacion = new Thread(() -> {
             while (ejecutando) {
+                if (cicloReloj % 20 == 0) {
+                        // Parámetros: ID, Ciclos Totales (5), Prioridad (1), Deadline (CicloActual + 15), E/S (-1, 0)
+                        PCB monitoreo = new PCB(contadorIds++, 5, 1, cicloReloj + 15, -1, 0);
+                        monitoreo.setEstado("Listo");
+                        System.out.println("SISTEMA: Tarea periódica de monitoreo generada.");
+                        agregarProceso(monitoreo);
+                    }
                 try {
                     cicloReloj++;
                     

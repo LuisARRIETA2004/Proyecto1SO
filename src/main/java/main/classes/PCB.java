@@ -56,7 +56,14 @@ public class PCB {
 
     @Override
     public String toString() {
-        if ("Bloqueado".equals(estado)) return "ID:" + id + " (E/S: " + longitudES + ")";
-        return "ID:" + id + " | P:" + prioridad + " | Rest:" + ciclosRestantes;
+        // Si el proceso está bloqueado, mostramos cuánto tiempo de E/S le queda
+        if ("Bloqueado".equals(estado) || "Bloqueado-Suspendido".equals(estado)) {
+            return String.format("ID:%02d | PC:%03d | E/S:%d", id, programCounter, longitudES);
+        }
+
+        // Para el resto (Listo, Ejecución, Suspendido), mostramos toda la info:
+        // %02d significa que el número siempre tendrá 2 dígitos (ej: 01, 02)
+        return String.format("ID:%02d | PC:%03d | MAR:%03d | P:%d | DLine:%d", 
+                             id, programCounter, mar, prioridad, deadline);
     }
 }
