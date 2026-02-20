@@ -85,15 +85,10 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     }
     // --- EVENTOS DE BOTONES (Solo delegan al Kernel) ---
 
-
-
     private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {                                              
         kernel.generarEmergencia();
         actualizarInterfaz();
     }
-
-    
-    // --- GENERATED CODE (No tocar abajo) ---
 
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
