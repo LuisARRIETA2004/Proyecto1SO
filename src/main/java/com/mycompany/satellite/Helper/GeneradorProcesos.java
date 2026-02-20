@@ -12,22 +12,14 @@ public class GeneradorProcesos {
     private static final Random random = new Random();
 
     public static PCB generarProcesoAleatorio(int id) {
-        int instrucciones = 10 + random.nextInt(41); 
+        int instrucciones = 15 + random.nextInt(30); 
         int prioridad = 1 + random.nextInt(3);
-        int deadline = (int) (instrucciones * (1.5 + random.nextDouble() * 1.5));
+        int deadline = (int) (instrucciones * 2);
         
-        // --- Lógica de E/S ---
-        int cicloBloqueo = -1; // -1 significa "No se bloquea"
-        int tiempoBloqueo = 0;
+        // --- FORZAMOS E/S AL 80% DE PROBABILIDAD ---
+        int cicloBloqueo = 2 + random.nextInt(8); // Se bloquea rápido, entre el ciclo 2 y 10
+        int tiempoBloqueo = 5 + random.nextInt(5); // Dura entre 5 y 10 ciclos bloqueado
         
-        // 50% de probabilidad de tener bloqueo
-        if (random.nextDouble() > 0.5 && instrucciones > 5) { 
-            // Se bloqueará en algún momento intermedio
-            cicloBloqueo = 2 + random.nextInt(instrucciones - 4); 
-            tiempoBloqueo = 3 + random.nextInt(5); // Duración de 3 a 7 ciclos
-        }
-        
-        // Llamamos al constructor nuevo de PCB
         return new PCB(id, instrucciones, prioridad, deadline, cicloBloqueo, tiempoBloqueo);
     }
 }
