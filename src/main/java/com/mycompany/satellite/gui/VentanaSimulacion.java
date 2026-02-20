@@ -83,35 +83,15 @@ public class VentanaSimulacion extends javax.swing.JFrame {
             if (p != null) modelo.addElement(p.toString());
         }
     }
-
     // --- EVENTOS DE BOTONES (Solo delegan al Kernel) ---
 
-    private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {                                             
-        kernel.generarProcesosMasivos();
-        actualizarInterfaz();
-    }                                            
 
-    private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        // Enviamos la velocidad actual antes de iniciar/parar
-        try {
-            int velocidad = (Integer) spinnerVelocidad.getValue();
-            kernel.setVelocidadSimulacion(velocidad);
-        } catch (Exception e) {}
-        
-        kernel.toggleSimulacion();
-    }                                        
 
     private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {                                              
         kernel.generarEmergencia();
         actualizarInterfaz();
     }
 
-    private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {                                                
-        String algo = (String) comboAlgoritmos.getSelectedItem();
-        System.out.println("Algoritmo cambiado a: " + algo);
-        kernel.setAlgoritmo(algo);
-        actualizarInterfaz();
-    }
     
     // --- GENERATED CODE (No tocar abajo) ---
 
@@ -496,99 +476,27 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnGenerar20ActionPerformed
-                                           
-        // CORRECCIÓN: Ya no calculamos nada aquí. Se lo pedimos al Kernel.
         kernel.generarProcesosMasivos();
         actualizarInterfaz();
     }//GEN-LAST:event_btnGenerar20ActionPerformed
 
     private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStartActionPerformed
+        // Enviamos la velocidad actual antes de iniciar/parar
         try {
             int velocidad = (Integer) spinnerVelocidad.getValue();
             kernel.setVelocidadSimulacion(velocidad);
         } catch (Exception e) {}
         
         kernel.toggleSimulacion();
-        
-        // Actualizamos el texto del botón
-        if (kernel.isEjecutando()) {
-            btnStart.setText("DETENER");
-        } else {
-            btnStart.setText("INICIAR");
-        }
     }//GEN-LAST:event_btnStartActionPerformed
 
     private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboAlgoritmosActionPerformed
         String algo = (String) comboAlgoritmos.getSelectedItem();
-        System.out.println(">>> Algoritmo cambiado a: " + algo);
-        
+        System.out.println("Algoritmo cambiado a: " + algo);
         kernel.setAlgoritmo(algo);
         actualizarInterfaz();
     }//GEN-LAST:event_comboAlgoritmosActionPerformed
-        // --- MOTOR DE SIMULACIÓN ---
-
-    private void iniciarMotor() {
-        if (ejecutando) return; 
-        ejecutando = true;
-        btnStart.setText("DETENER");
-
-        hiloSimulacion = new Thread(() -> {
-            while (ejecutando) {
-                try {
-                    cicloReloj++;
-                    
-                    // EL KERNEL HACE EL TRABAJO DURO
-                    kernel.ejecutarCicloDelSistema(); 
-                    
-                    // Actualizamos la pantalla
-                    javax.swing.SwingUtilities.invokeLater(() -> actualizarInterfaz());
-
-                    // Control de velocidad
-                    int velocidad = 1000;
-                    try { 
-                        velocidad = (Integer) spinnerVelocidad.getValue(); 
-                    } catch (Exception e) {}
-                    Thread.sleep(velocidad); 
-
-                } catch (InterruptedException e) {
-                    System.out.println("Simulación interrumpida");
-                }
-            }
-        });
-        hiloSimulacion.start();
-    }
-
-    private void detenerMotor() {
-        ejecutando = false;
-        btnStart.setText("INICIAR");
-    }
-
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        //</editor-fold>
-
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new VentanaSimulacion().setVisible(true);
-            }
-        });
-    }
-
+  
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JProgressBar barraMemoria;
     private javax.swing.JButton btnEmergencia;
