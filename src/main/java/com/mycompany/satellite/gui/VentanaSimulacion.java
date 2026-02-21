@@ -1,110 +1,116 @@
 package com.mycompany.satellite.gui;
 
-// Importaciones necesarias
 import com.mycompany.satellite.Helper.Queue;
-import com.mycompany.satellite.Helper.GeneradorProcesos;
 import main.classes.PCB;
+import main.classes.Planificador;
 import javax.swing.DefaultListModel;
 import java.awt.Color;
 
-/**
- * Ventana Principal del Simulador RTOS
- */
 public class VentanaSimulacion extends javax.swing.JFrame {
 
-    // --- ESTRUCTURAS DE DATOS (Backend) ---
-    private Queue<PCB> colaListos;
-    private Queue<PCB> colaBloqueados;
-    private Queue<PCB> colaListosSusp;
-    private Queue<PCB> colaBloqSusp;
-    
-    // --- MODELOS VISUALES (Frontend) ---
-    private DefaultListModel<String> modeloListos;
-    private DefaultListModel<String> modeloBloqueados;
-    private DefaultListModel<String> modeloListosSusp;
-    private DefaultListModel<String> modeloBloqSusp;
+    // --- EL CEREBRO ---
+    private Planificador kernel;
 
-    // --- VARIABLES DE CONTROL ---
-    private int contadorIds = 1;
-    private int cicloReloj = 0;
-    private final int MAX_MEMORIA = 10; // Capacidad máxima de la RAM simulada
+    // --- MODELOS VISUALES ---
+    private DefaultListModel<String> modeloListos = new DefaultListModel<>();
+    private DefaultListModel<String> modeloBloqueados = new DefaultListModel<>();
+    private DefaultListModel<String> modeloListosSusp = new DefaultListModel<>();
+    private DefaultListModel<String> modeloBloqSusp = new DefaultListModel<>();
 
-    /**
-     * Constructor: Inicializa todo
-     */
     public VentanaSimulacion() {
-        // 1. Inicializar Colas
-        colaListos = new Queue<>();
-        colaBloqueados = new Queue<>();
-        colaListosSusp = new Queue<>();
-        colaBloqSusp = new Queue<>();
+        // 1. Inicializar el Kernel
+        kernel = new Planificador();
+        kernel.setVentana(this); // 
 
-        // 2. Inicializar Modelos de Listas
-        modeloListos = new DefaultListModel<>();
-        modeloBloqueados = new DefaultListModel<>();
-        modeloListosSusp = new DefaultListModel<>();
-        modeloBloqSusp = new DefaultListModel<>();
-
-        // 3. Cargar Diseño Visual
+        // 2. GUI (NetBeans)
         initComponents();
-        personalizarDiseño();
+        this.setLocationRelativeTo(null);
+        this.getContentPane().setBackground(new Color(0, 0, 51));
 
-        // 4. Conectar Modelos a las Listas Visuales
+        // 3. Conectar Modelos
         listReadyQueue.setModel(modeloListos);
         listBlockedQueue.setModel(modeloBloqueados);
         listListosSuspendidos.setModel(modeloListosSusp);
         listBloqueadosSuspendidos.setModel(modeloBloqSusp);
 
-        // 5. Carga Inicial Automática (Requisito PDF)
-        cargarProcesosIniciales();
+        // 4. Carga Inicial
+        kernel.crearProcesosIniciales();
     }
     
-    private void personalizarDiseño() {
-        this.setLocationRelativeTo(null); // Centrar ventana
-        // Configurar colores básicos si no se hizo en el diseñador
-        this.getContentPane().setBackground(new Color(0, 0, 51));
-    }
+    // --- MÉTODOS PÚBLICOS ---
+    
+    public void dibujarGrafica(int porcentajeUso) {
+        java.awt.Graphics g = panelGrafica.getGraphics();
+        if (g != null) {
+            // Limpiar el fondo
+            g.setColor(new java.awt.Color(0, 0, 51));
+            g.fillRect(5, 20, panelGrafica.getWidth() - 10, panelGrafica.getHeight() - 30);
 
-    // ---------------------------------------------------------
-    // LÓGICA DE NEGOCIO
-    // ---------------------------------------------------------
+            // Dibujar barra de rendimiento
+            g.setColor(java.awt.Color.CYAN);
+            int altoBarra = (porcentajeUso * (panelGrafica.getHeight() - 40)) / 100;
+            g.fillRect(20, panelGrafica.getHeight() - altoBarra - 10, panelGrafica.getWidth() - 40, altoBarra);
 
-    private void cargarProcesosIniciales() {
-        // Crear 5 procesos al inicio
-        for (int i = 0; i < 5; i++) {
-            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-            nuevo.setEstado("Listo");
-            colaListos.enqueue(nuevo);
+            // Texto
+            g.setColor(java.awt.Color.WHITE);
+            g.drawString(porcentajeUso + "%", panelGrafica.getWidth()/2 - 10, panelGrafica.getHeight()/2);
         }
-        actualizarInterfaz();
     }
-
-    /**
-     * Refresca TODOS los elementos visuales basándose en las colas reales
-     */
     public void actualizarInterfaz() {
-        // 1. Actualizar Reloj
-        lblReloj.setText("MISSION CLOCK: Cycle " + cicloReloj);
-
-        // 2. Actualizar Listas (Helpers visuales)
-        llenarModelo(modeloListos, colaListos);
-        llenarModelo(modeloBloqueados, colaBloqueados);
-        llenarModelo(modeloListosSusp, colaListosSusp);
-        llenarModelo(modeloBloqSusp, colaBloqSusp);
-
-        // 3. Actualizar Barra de Memoria RAM
-        int ocupados = colaListos.getSize() + colaBloqueados.getSize(); 
-        // Nota: En un sistema real, sumamos también el proceso en CPU
+        // Reloj
         
-        int porcentaje = (ocupados * 100) / MAX_MEMORIA;
+        // Mostrar estadísticas en la parte inferior o en el título
+        this.setTitle("RTOS Simulator - Éxitos: " + kernel.getProcesosExitosos() + " | Fallos: " + kernel.getProcesosFallidos());
+        lblReloj.setText("MISSION CLOCK: Cycle " + kernel.getCicloReloj());
+        // Listas
+        llenarModelo(modeloListos, kernel.getColaListos());
+        llenarModelo(modeloBloqueados, kernel.getColaBloqueados());
+        llenarModelo(modeloListosSusp, kernel.getColaListosSusp());
+        llenarModelo(modeloBloqSusp, kernel.getColaBloqSusp());
+
+        // Memoria
+        int ocupados = kernel.getOcupacionMemoria();
+        int porcentaje = (ocupados * 100) / 10;
+        if (porcentaje > 100) porcentaje = 100;
         barraMemoria.setValue(porcentaje);
-        barraMemoria.setString(ocupados + "/" + MAX_MEMORIA + " Procesos (" + porcentaje + "%)");
+        barraMemoria.setString(ocupados + "/10 (" + porcentaje + "%)");
+        barraMemoria.setForeground(porcentaje >= 100 ? Color.RED : Color.GREEN);
         
-        if (porcentaje >= 100) barraMemoria.setForeground(Color.RED);
-        else barraMemoria.setForeground(Color.GREEN);
+        // CPU
+        PCB p = kernel.getCpu().getCurrentProcess();
+    
+        if (p != null) {
+            // Calculamos qué porcentaje del proceso ya se completó
+            // Formula: ((Total - Restante) * 100) / Total
+            int completado = ((p.getCiclosTotales() - p.getCiclosRestantes()) * 100) / p.getCiclosTotales();
+
+            barraCpu.setValue(completado);
+            barraCpu.setString("Ejecutando ID: " + p.getId() + " (" + completado + "%)");
+            barraCpu.setForeground(java.awt.Color.CYAN); // Color de "en progreso"
+
+            lblCpuId.setText(String.valueOf(p.getId()));
+            lblCpuEstado.setText(p.getEstado());
+            lblCpuPC.setText(String.valueOf(p.getProgramCounter()));
+            lblCpuMAR.setText(String.valueOf(p.getMar()));
+        } else {
+            // Si no hay nadie trabajando
+            barraCpu.setValue(0);
+            barraCpu.setString("SISTEMA EN ESPERA (IDLE)");
+            barraCpu.setForeground(java.awt.Color.DARK_GRAY);
+
+            lblCpuId.setText("---");
+            lblCpuEstado.setText("IDLE");
+            lblCpuPC.setText("---");
+            lblCpuMAR.setText("---");
+        }
+        int uso = (kernel.getCpu().isBusy()) ? 100 : 0;
+        dibujarGrafica(uso);
+    }
+    
+    public void setEstadoBotonStart(String texto) {
+        btnStart.setText(texto);
     }
 
-    // Método auxiliar para no repetir código de llenado de listas
     private void llenarModelo(DefaultListModel<String> modelo, Queue<PCB> cola) {
         modelo.clear();
         for (int i = 0; i < cola.getSize(); i++) {
@@ -112,40 +118,8 @@ public class VentanaSimulacion extends javax.swing.JFrame {
             if (p != null) modelo.addElement(p.toString());
         }
     }
+    // --- EVENTOS DE BOTONES (Solo delegan al Kernel) ---
 
-    // ---------------------------------------------------------
-    // ACCIONES DE BOTONES (Conectar en Design)
-    // ---------------------------------------------------------
-
-    private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {                                             
-        for (int i = 0; i < 20; i++) {
-            PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-            nuevo.setEstado("Listo");
-            
-            // Lógica simple de memoria llena (Swap)
-            if (colaListos.getSize() + colaBloqueados.getSize() >= MAX_MEMORIA) {
-                nuevo.setEstado("Listo-Suspendido");
-                colaListosSusp.enqueue(nuevo);
-            } else {
-                colaListos.enqueue(nuevo);
-            }
-        }
-        actualizarInterfaz();
-    }                                            
-
-    private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {                                              
-        PCB nuevo = GeneradorProcesos.generarProcesoAleatorio(contadorIds++);
-        nuevo.setEstado("Listo"); // Las emergencias intentan entrar a RAM
-        // Aquí podrías implementar lógica para expulsar a alguien si está llena
-        colaListos.enqueue(nuevo);
-        actualizarInterfaz();
-    }                                             
-
-    private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        // Aquí irá el Timer o Hilo de simulación más adelante
-        cicloReloj++;
-        actualizarInterfaz();
-    }     
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -180,16 +154,25 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         btnStart = new javax.swing.JButton();
         btnGenerar20 = new javax.swing.JButton();
         btnEmergencia = new javax.swing.JButton();
+        comboAlgoritmos = new javax.swing.JComboBox<>();
+        spinnerVelocidad = new javax.swing.JSpinner();
+        jLabel7 = new javax.swing.JLabel();
+        jLabel8 = new javax.swing.JLabel();
+        CargarArchivo = new javax.swing.JButton();
+        panelGrafica = new javax.swing.JPanel();
+        barraCpu = new javax.swing.JProgressBar();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setBackground(new java.awt.Color(0, 0, 51));
 
         jPanel1.setBackground(new java.awt.Color(0, 0, 51));
 
+        jPanel2.setBackground(new java.awt.Color(51, 153, 255));
         jPanel2.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(255, 255, 255), 2));
 
-        lblReloj.setFont(new java.awt.Font("Segoe UI", 1, 24)); // NOI18N
+        lblReloj.setFont(new java.awt.Font("Segoe UI Black", 3, 24)); // NOI18N
         lblReloj.setForeground(new java.awt.Color(0, 255, 0));
+        lblReloj.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblReloj.setText("MISSION CLOCK: Cycle 0");
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
@@ -197,19 +180,23 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         jPanel2Layout.setHorizontalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
-                .addGap(76, 76, 76)
-                .addComponent(lblReloj)
-                .addContainerGap(87, Short.MAX_VALUE))
+                .addContainerGap()
+                .addComponent(lblReloj, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
+                .addContainerGap()
                 .addComponent(lblReloj)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
-        jPanel3.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Ready Queue", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 0, 14))); // NOI18N
+        jPanel3.setBackground(new java.awt.Color(51, 153, 255));
+        jPanel3.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Ready Queue", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 1, 14), new java.awt.Color(255, 255, 255))); // NOI18N
 
+        listReadyQueue.setBackground(new java.awt.Color(232, 252, 255));
+        listReadyQueue.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED));
         listReadyQueue.setModel(new javax.swing.AbstractListModel<String>() {
             String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
             public int getSize() { return strings.length; }
@@ -223,17 +210,18 @@ public class VentanaSimulacion extends javax.swing.JFrame {
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel3Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 189, Short.MAX_VALUE)
+                .addComponent(jScrollPane1)
                 .addContainerGap())
         );
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel3Layout.createSequentialGroup()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 8, Short.MAX_VALUE))
+                .addComponent(jScrollPane1)
+                .addContainerGap())
         );
 
-        jPanel4.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Main Memory", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 0, 14))); // NOI18N
+        jPanel4.setBackground(new java.awt.Color(204, 255, 255));
+        jPanel4.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Main Memory", javax.swing.border.TitledBorder.CENTER, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 0, 14))); // NOI18N
 
         barraMemoria.setStringPainted(true);
 
@@ -243,19 +231,21 @@ public class VentanaSimulacion extends javax.swing.JFrame {
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel4Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(barraMemoria, javax.swing.GroupLayout.DEFAULT_SIZE, 298, Short.MAX_VALUE)
+                .addComponent(barraMemoria, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addContainerGap())
         );
         jPanel4Layout.setVerticalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel4Layout.createSequentialGroup()
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(jPanel4Layout.createSequentialGroup()
                 .addComponent(barraMemoria, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap())
+                .addContainerGap(7, Short.MAX_VALUE))
         );
 
-        jPanel5.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Blocked Queue", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 0, 14))); // NOI18N
+        jPanel5.setBackground(new java.awt.Color(51, 153, 255));
+        jPanel5.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Blocked Queue", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 1, 14), new java.awt.Color(255, 255, 255))); // NOI18N
 
+        listBlockedQueue.setBackground(new java.awt.Color(232, 252, 255));
+        listBlockedQueue.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED));
         listBlockedQueue.setModel(new javax.swing.AbstractListModel<String>() {
             String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
             public int getSize() { return strings.length; }
@@ -275,12 +265,16 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         jPanel5Layout.setVerticalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel5Layout.createSequentialGroup()
-                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, Short.MAX_VALUE))
+                .addComponent(jScrollPane2)
+                .addContainerGap())
         );
 
-        jPanel6.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Swap Space", javax.swing.border.TitledBorder.CENTER, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 0, 14))); // NOI18N
+        jPanel6.setBackground(new java.awt.Color(51, 153, 255));
+        jPanel6.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Swap Space", javax.swing.border.TitledBorder.CENTER, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Segoe UI", 0, 24), new java.awt.Color(255, 255, 255))); // NOI18N
+        jPanel6.setForeground(new java.awt.Color(255, 255, 255));
 
+        listListosSuspendidos.setBackground(new java.awt.Color(232, 252, 255));
+        listListosSuspendidos.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED));
         listListosSuspendidos.setModel(new javax.swing.AbstractListModel<String>() {
             String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
             public int getSize() { return strings.length; }
@@ -288,6 +282,8 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         });
         jScrollPane3.setViewportView(listListosSuspendidos);
 
+        listBloqueadosSuspendidos.setBackground(new java.awt.Color(232, 252, 255));
+        listBloqueadosSuspendidos.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED));
         listBloqueadosSuspendidos.setModel(new javax.swing.AbstractListModel<String>() {
             String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
             public int getSize() { return strings.length; }
@@ -295,8 +291,12 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         });
         jScrollPane4.setViewportView(listBloqueadosSuspendidos);
 
+        jLabel1.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
+        jLabel1.setForeground(new java.awt.Color(255, 255, 255));
         jLabel1.setText("Ready-Suspended");
 
+        jLabel2.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
+        jLabel2.setForeground(new java.awt.Color(255, 255, 255));
         jLabel2.setText("Blocked-Suspended");
 
         javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
@@ -307,48 +307,66 @@ public class VentanaSimulacion extends javax.swing.JFrame {
                 .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel6Layout.createSequentialGroup()
                         .addGap(33, 33, 33)
-                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 234, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 300, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addGroup(jPanel6Layout.createSequentialGroup()
-                        .addGap(96, 96, 96)
+                        .addGap(104, 104, 104)
                         .addComponent(jLabel1)))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 56, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 32, Short.MAX_VALUE)
                 .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
-                        .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 234, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 300, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(23, 23, 23))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
                         .addComponent(jLabel2)
-                        .addGap(85, 85, 85))))
+                        .addGap(93, 93, 93))))
         );
         jPanel6Layout.setVerticalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel6Layout.createSequentialGroup()
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel1)
-                    .addComponent(jLabel2, javax.swing.GroupLayout.Alignment.TRAILING))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel2)
+                    .addComponent(jLabel1))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(14, Short.MAX_VALUE))
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 200, Short.MAX_VALUE)
+                    .addComponent(jScrollPane4))
+                .addGap(48, 48, 48))
         );
 
-        jPanel7.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Running Process", javax.swing.border.TitledBorder.CENTER, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 0, 14))); // NOI18N
+        jPanel7.setBackground(new java.awt.Color(51, 153, 255));
+        jPanel7.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Running Process", javax.swing.border.TitledBorder.CENTER, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 1, 14), new java.awt.Color(255, 255, 255))); // NOI18N
 
+        jLabel3.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        jLabel3.setForeground(new java.awt.Color(255, 255, 255));
         jLabel3.setText("ID:");
 
+        lblCpuId.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblCpuId.setForeground(new java.awt.Color(255, 255, 255));
         lblCpuId.setText("---");
 
+        jLabel5.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        jLabel5.setForeground(new java.awt.Color(255, 255, 255));
         jLabel5.setText("Estado:");
 
+        lblCpuEstado.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblCpuEstado.setForeground(new java.awt.Color(255, 255, 255));
         lblCpuEstado.setText("---");
 
+        jLabel4.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        jLabel4.setForeground(new java.awt.Color(255, 255, 255));
         jLabel4.setText("PC:");
 
+        lblCpuPC.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblCpuPC.setForeground(new java.awt.Color(255, 255, 255));
         lblCpuPC.setText("---");
 
+        jLabel6.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        jLabel6.setForeground(new java.awt.Color(255, 255, 255));
         jLabel6.setText("MAR:");
 
+        lblCpuMAR.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblCpuMAR.setForeground(new java.awt.Color(255, 255, 255));
         lblCpuMAR.setText("---");
 
         javax.swing.GroupLayout jPanel7Layout = new javax.swing.GroupLayout(jPanel7);
@@ -374,12 +392,11 @@ public class VentanaSimulacion extends javax.swing.JFrame {
                         .addComponent(jLabel6)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(lblCpuMAR)))
-                .addContainerGap(208, Short.MAX_VALUE))
+                .addContainerGap(202, Short.MAX_VALUE))
         );
         jPanel7Layout.setVerticalGroup(
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel7Layout.createSequentialGroup()
-                .addContainerGap()
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel3)
                     .addComponent(lblCpuId))
@@ -387,84 +404,170 @@ public class VentanaSimulacion extends javax.swing.JFrame {
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel5)
                     .addComponent(lblCpuEstado))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel4)
                     .addComponent(lblCpuPC))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel6)
                     .addComponent(lblCpuMAR))
-                .addContainerGap(49, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
+        btnStart.setBackground(new java.awt.Color(90, 255, 139));
+        btnStart.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         btnStart.setText("INICIAR");
         btnStart.setMinimumSize(new java.awt.Dimension(70, 20));
+        btnStart.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnStartActionPerformed(evt);
+            }
+        });
 
+        btnGenerar20.setBackground(new java.awt.Color(255, 247, 107));
+        btnGenerar20.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         btnGenerar20.setText("GENERAR 20");
+        btnGenerar20.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnGenerar20ActionPerformed(evt);
+            }
+        });
 
+        btnEmergencia.setBackground(new java.awt.Color(195, 0, 0));
+        btnEmergencia.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         btnEmergencia.setText("EMERGENCIA");
+        btnEmergencia.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEmergenciaActionPerformed(evt);
+            }
+        });
+
+        comboAlgoritmos.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "FCFS", "Round Robin", "SPN", "SRT", "HRRN" }));
+        comboAlgoritmos.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                comboAlgoritmosActionPerformed(evt);
+            }
+        });
+
+        spinnerVelocidad.setModel(new javax.swing.SpinnerNumberModel(1000, 100, null, 100));
+
+        jLabel7.setBackground(new java.awt.Color(255, 255, 255));
+        jLabel7.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
+        jLabel7.setForeground(new java.awt.Color(255, 255, 255));
+        jLabel7.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel7.setText("Velocidad (ms)");
+
+        jLabel8.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
+        jLabel8.setForeground(new java.awt.Color(255, 255, 255));
+        jLabel8.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel8.setText("Politica");
+
+        CargarArchivo.setBackground(new java.awt.Color(255, 247, 107));
+        CargarArchivo.setText("CARGAR CSV");
+        CargarArchivo.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                CargarArchivoActionPerformed(evt);
+            }
+        });
+
+        panelGrafica.setBackground(new java.awt.Color(204, 255, 255));
+        panelGrafica.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0), 2), "Running Process (CPU)", javax.swing.border.TitledBorder.CENTER, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Segoe UI", 0, 14))); // NOI18N
+
+        barraCpu.setStringPainted(true);
+
+        javax.swing.GroupLayout panelGraficaLayout = new javax.swing.GroupLayout(panelGrafica);
+        panelGrafica.setLayout(panelGraficaLayout);
+        panelGraficaLayout.setHorizontalGroup(
+            panelGraficaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(panelGraficaLayout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(barraCpu, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
+        );
+        panelGraficaLayout.setVerticalGroup(
+            panelGraficaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(panelGraficaLayout.createSequentialGroup()
+                .addComponent(barraCpu, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 12, Short.MAX_VALUE))
+        );
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
             .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
+                .addGap(25, 25, 25)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addComponent(jPanel3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(34, 34, 34)
-                        .addComponent(jPanel4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(28, 28, 28)
-                        .addComponent(jPanel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(btnGenerar20, javax.swing.GroupLayout.DEFAULT_SIZE, 231, Short.MAX_VALUE)
+                    .addComponent(comboAlgoritmos, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(jLabel8, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(CargarArchivo, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(18, 18, 18)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                        .addGap(0, 0, Short.MAX_VALUE)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(182, 182, 182))
-                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                                .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(270, 270, 270))))))
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                .addGap(37, 37, 37)
-                .addComponent(btnGenerar20, javax.swing.GroupLayout.PREFERRED_SIZE, 160, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(btnStart, javax.swing.GroupLayout.PREFERRED_SIZE, 160, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(131, 131, 131)
-                .addComponent(btnEmergencia, javax.swing.GroupLayout.PREFERRED_SIZE, 160, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(43, 43, 43))
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                            .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(jPanel4, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(jPanel6, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(panelGrafica, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addGap(18, 18, 18)
+                        .addComponent(jPanel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(jPanel1Layout.createSequentialGroup()
+                            .addGap(195, 195, 195)
+                            .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 285, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(spinnerVelocidad, javax.swing.GroupLayout.PREFERRED_SIZE, 285, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGap(0, 0, Short.MAX_VALUE))
+                        .addGroup(jPanel1Layout.createSequentialGroup()
+                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                .addGroup(jPanel1Layout.createSequentialGroup()
+                                    .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                    .addComponent(btnEmergencia, javax.swing.GroupLayout.PREFERRED_SIZE, 219, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                                    .addComponent(btnStart, javax.swing.GroupLayout.PREFERRED_SIZE, 292, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addGap(457, 457, 457))))))
+                .addGap(33, 33, 33))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addComponent(jPanel4, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(panelGrafica, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(jPanel5, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGap(68, 68, 68)
-                        .addComponent(jPanel4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addGap(9, 9, 9)
-                .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 40, Short.MAX_VALUE)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(btnEmergencia, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, 296, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(jPanel5, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                        .addComponent(btnGenerar20, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(CargarArchivo)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabel8))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addComponent(btnEmergencia, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(btnStart, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(btnGenerar20, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(74, 74, 74))
+                    .addComponent(comboAlgoritmos, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jLabel7)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(spinnerVelocidad, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(94, 94, 94))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -475,60 +578,73 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 6, Short.MAX_VALUE))
+            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
+    private void btnGenerar20ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnGenerar20ActionPerformed
+        kernel.generarProcesosMasivos();
+        actualizarInterfaz();
+    }//GEN-LAST:event_btnGenerar20ActionPerformed
+
+    private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStartActionPerformed
+        // Enviamos la velocidad actual antes de iniciar/parar
         try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(VentanaSimulacion.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            int velocidad = (Integer) spinnerVelocidad.getValue();
+            kernel.setVelocidadSimulacion(velocidad);
+        } catch (Exception e) {}
+        
+        kernel.toggleSimulacion();
+    }//GEN-LAST:event_btnStartActionPerformed
+
+    private void comboAlgoritmosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboAlgoritmosActionPerformed
+        String algo = (String) comboAlgoritmos.getSelectedItem();
+        System.out.println("Algoritmo cambiado a: " + algo);
+        kernel.setAlgoritmo(algo);
+        actualizarInterfaz();
+    }//GEN-LAST:event_comboAlgoritmosActionPerformed
+
+    private void CargarArchivoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_CargarArchivoActionPerformed
+        javax.swing.JFileChooser explorador = new javax.swing.JFileChooser();
+        explorador.setDialogTitle("Seleccione el archivo CSV de procesos");
+        
+        int seleccion = explorador.showOpenDialog(this);
+        
+        // 2. Si el usuario seleccionó un archivo y le dio Aceptar
+        if (seleccion == javax.swing.JFileChooser.APPROVE_OPTION) {
+            java.io.File archivo = explorador.getSelectedFile();
+            
+            // 3. Llamar a nuestro Helper para leer el archivo
+            com.mycompany.satellite.Helper.CargadorArchivos.cargarDesdeCSV(archivo.getAbsolutePath(), kernel);
+            
+            // 4. Refrescar la pantalla
+            actualizarInterfaz();
         }
-        //</editor-fold>
+    }//GEN-LAST:event_CargarArchivoActionPerformed
 
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new VentanaSimulacion().setVisible(true);
-            }
-        });
-    }
-
+    private void btnEmergenciaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEmergenciaActionPerformed
+        kernel.generarEmergencia();
+        actualizarInterfaz();
+    }//GEN-LAST:event_btnEmergenciaActionPerformed
+  
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton CargarArchivo;
+    private javax.swing.JProgressBar barraCpu;
     private javax.swing.JProgressBar barraMemoria;
     private javax.swing.JButton btnEmergencia;
     private javax.swing.JButton btnGenerar20;
     private javax.swing.JButton btnStart;
+    private javax.swing.JComboBox<String> comboAlgoritmos;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
+    private javax.swing.JLabel jLabel7;
+    private javax.swing.JLabel jLabel8;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
@@ -549,5 +665,7 @@ public class VentanaSimulacion extends javax.swing.JFrame {
     private javax.swing.JList<String> listBloqueadosSuspendidos;
     private javax.swing.JList<String> listListosSuspendidos;
     private javax.swing.JList<String> listReadyQueue;
+    private javax.swing.JPanel panelGrafica;
+    private javax.swing.JSpinner spinnerVelocidad;
     // End of variables declaration//GEN-END:variables
 }
